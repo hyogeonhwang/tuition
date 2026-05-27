@@ -183,6 +183,26 @@ tr.inactive td{opacity:.38;}
 @keyframes toastIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
 @keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateX(20px)} }
 </style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      databaseURL: "https://altiora-tuition-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Firebase 저장
+    async function fbSave(path, data){
+      await db.ref(path).set(data);
+    }
+    // Firebase 읽기
+    async function fbGet(path){
+      const snap = await db.ref(path).get();
+      return snap.exists() ? snap.val() : null;
+    }
+  </script>
 </head>
 <body>
 
@@ -869,26 +889,61 @@ function defaultMaster(){
 }
 
 function loadYearData(y){
-  const raw=localStorage.getItem(getYearKey(y));
+  // Firebase에서 비동기 로드 — init()에서 별도 처리
+  return {year:y,master:defaultMaster(),students:[],textbooks:[],billings:{},closed:false};
+}
+function showLoadingOverlay(msg='로딩 중...'){
+  const el=document.getElementById('loading-overlay');
+  if(el){el.style.display='flex';document.getElementById('loading-msg').textContent=msg;}
+}
+function hideLoadingOverlay(){
+  const el=document.getElementById('loading-overlay');
+  if(el) el.style.display='none';
+}
+function saveYearData(){
+  // localStorage 병행 저장 (오프라인 대비)
+  localStorage.setItem(getYearKey(CY.year),JSON.stringify(CY));
+  // Firebase 저장
+  fbSave('data_'+CY.year, CY).catch(e=>console.warn('Firebase 저장 실패:',e));
+}
+async function loadYearDataFromFB(y){
+  try {
+    const data = await fbGet('data_'+y);
+    if(data){
+      // htime 마이그레이션 + 누락 필드 복원
+      (data.students||[]).forEach(s=>{
+        if(s.htime==='1510') s.htime='alt_t_1510';
+        else if(s.htime==='1620') s.htime='alt_t_1620';
+        // Firebase에서 빈 문자열 필드 누락 복원
+        if(s.siblingId===undefined) s.siblingId='';
+        if(s.otDays===undefined) s.otDays='';
+        if(s.careOverride===undefined) s.careOverride='';
+        if(s.memo===undefined) s.memo='';
+        if(s.leaveMonth===undefined) s.leaveMonth='';
+      });
+      return data;
+    }
+  } catch(e){ console.warn('Firebase 로드 실패, localStorage 사용:', e); }
+  // Firebase 실패 시 localStorage fallback
+  const raw = localStorage.getItem(getYearKey(y));
   if(raw){
     const data = JSON.parse(raw);
-    // htime 자동 마이그레이션 ('1510'→'alt_t_1510', '1620'→'alt_t_1620')
     let migrated = false;
     (data.students||[]).forEach(s=>{
       if(s.htime==='1510'){s.htime='alt_t_1510'; migrated=true;}
       else if(s.htime==='1620'){s.htime='alt_t_1620'; migrated=true;}
     });
-    if(migrated) localStorage.setItem(getYearKey(y), JSON.stringify(data));
     return data;
   }
   return {year:y,master:defaultMaster(),students:[],textbooks:[],billings:{},closed:false};
 }
-function saveYearData(){localStorage.setItem(getYearKey(CY.year),JSON.stringify(CY));}
 
 function getArchiveList(){
+  // localStorage 기반 (Firebase는 비동기라 별도 처리)
   return Object.keys(localStorage)
     .filter(k=>k.startsWith('data_'))
-    .map(k=>JSON.parse(localStorage.getItem(k)))
+    .map(k=>{try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}})
+    .filter(Boolean)
     .sort((a,b)=>b.year-a.year);
 }
 
@@ -899,9 +954,13 @@ let currentYear=(()=>{
 })();
 let CY=loadYearData(currentYear);
 
-function switchYear(y){
+async function switchYear(y){
   currentYear=y;
   localStorage.setItem('current_year',y);
+  showLoadingOverlay('데이터 로딩 중...');
+  CY = await loadYearDataFromFB(y);
+  localStorage.setItem(getYearKey(y), JSON.stringify(CY));
+  hideLoadingOverlay();
   CY=loadYearData(y);
   document.getElementById('sidebar-year').textContent=y+'학년도';
   document.getElementById('topbar-year').textContent=y;
@@ -1004,7 +1063,7 @@ function calcBilling(s,month){
 // ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
-function init(){
+async function init(){
   const now=new Date();
   document.getElementById('topbar-date').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일`;
   document.getElementById('sidebar-year').textContent=currentYear+'학년도';
@@ -1012,12 +1071,27 @@ function init(){
   const ySel=document.getElementById('billing-year');
   for(let y=2025;y<=2028;y++){const o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===now.getFullYear())o.selected=true;ySel.appendChild(o);}
   document.getElementById('billing-month').value=now.getMonth()+1;
+
+  // Firebase에서 데이터 로드
+  showLoadingOverlay('Firebase에서 데이터 로딩 중...');
+  try {
+    const fbData = await loadYearDataFromFB(currentYear);
+    CY = fbData;
+    // localStorage도 동기화
+    localStorage.setItem(getYearKey(currentYear), JSON.stringify(CY));
+    localStorage.setItem('current_year', String(currentYear));
+  } catch(e){ console.warn('Firebase 로드 실패:', e); }
+  hideLoadingOverlay();
+
   if(!CY.students||!CY.students.length){CY.students=[];loadSample();}
   if(!CY.textbooks||!CY.textbooks.length){CY.textbooks=[];loadSampleTB();}
   updateClassOptions();updateTbClass();updateStudentClassFilter();
   renderDashboard();renderStudentTable();renderTextbookTable();renderMasterContent('tuition');renderSpecialList('all');renderArchiveList();
   // 마지막 생성 청구서 복원
   restoreLastBilling();
+  // 마지막 페이지 복원
+  const lastPage = localStorage.getItem('current_page');
+  if(lastPage && lastPage !== 'dashboard') showPage(lastPage);
 
 }
 
@@ -1040,6 +1114,7 @@ function showPage(p){
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(e=>{if((e.getAttribute('onclick')||'').includes("'"+p+"'"))e.classList.add('active');});
   document.getElementById('topbar-title').textContent=PAGE_TITLES[p]||p;
+  localStorage.setItem('current_page', p);
   if(p==='dashboard')renderDashboard();
   if(p==='students')renderStudentTable();
   if(p==='special')renderSpecialList('all');
@@ -1209,16 +1284,6 @@ function changeDashMonth(delta){
   if(dashViewMonth > 12) dashViewMonth = 1;
   renderDashboard(dashViewMonth);
 }
-
-function toggleAccordion(idx){
-  const body = document.getElementById('acc-body-'+idx);
-  const arrow = document.getElementById('acc-arrow-'+idx);
-  if(!body) return;
-  const isOpen = body.style.display !== 'none';
-  body.style.display = isOpen ? 'none' : 'block';
-  if(arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
-}
-
 
 function toggleAccordion(idx){
   const body = document.getElementById('acc-body-'+idx);
@@ -2062,30 +2127,7 @@ function updateClassFee(brand, cls, field, value){
 }
 
 // 새 단가 항목 추가
-function addFeeItem(prefix, defaultLabel){
-  document.getElementById('modal-master-title').textContent='단가 항목 추가';
-  document.getElementById('modal-master-body').innerHTML=`
-    <div class="form-row"><div class="form-group full">
-      <label>항목명</label>
-      <input type="text" id="fi-label" value="${defaultLabel}">
-    </div></div>
-    <div class="form-row"><div class="form-group">
-      <label>금액 (원)</label>
-      <input type="number" id="fi-amount" value="0" min="0" step="1000">
-    </div></div>`;
-  document.getElementById('modal-master-save').onclick=()=>{
-    const label = document.getElementById('fi-label').value;
-    const amount = parseInt(document.getElementById('fi-amount').value)||0;
-    const key = prefix + Date.now();
-    if(!M().feeItems) M().feeItems={};
-    M().feeItems[key] = {label, amount};
-    saveYearData();
-    closeModal('modal-master');
-    renderMasterContent(currentMasterTab);
-    toast(`${label} 항목 추가됨`);
-  };
-  document.getElementById('modal-master').classList.add('open');
-}
+// addFeeItem 구버전 제거됨
 
 
 
@@ -2288,7 +2330,7 @@ function startNewYear(){
 function deleteArchive(year){
   if(year===currentYear){alert('현재 운영 중인 학년도는 삭제할 수 없습니다.');return;}
   showConfirm(`${year}학년도 아카이브를 영구 삭제하시겠습니까?`,()=>{
-    localStorage.removeItem(getYearKey(year));renderArchiveList();
+    localStorage.removeItem(getYearKey(year)); fbSave('data_'+year, null).catch(()=>{}); renderArchiveList();
   });
 }
 
