@@ -344,10 +344,10 @@ tr.inactive td{opacity:.38;}
 
         <!-- 이달 1회성 추가비용 -->
         <div id="onetime-section" style="margin-top:16px;border-top:2px solid var(--border);padding-top:14px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
             <div style="font-size:14px;font-weight:700;">💳 이달 1회성 추가비용</div>
-            <button class="btn btn-primary btn-sm" onclick="addOnetimeRow()">+ 항목 추가</button>
-            <span class="text-xs text-muted" style="color:var(--text3);">AR비용 · 입학금 · 도서보증금 · 원복비 · 기타</span>
+            <button class="btn btn-secondary btn-sm" onclick="addOnetimeRow()">+ 항목 추가</button>
+            <span class="text-xs text-muted" style="color:var(--text3);">원생 행의 + 버튼으로도 추가 가능</span>
           </div>
           <div id="onetime-rows"></div>
           <div id="onetime-total" style="text-align:right;font-size:13px;color:var(--text2);margin-top:6px;"></div>
@@ -613,19 +613,7 @@ tr.inactive td{opacity:.38;}
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>1:1 수업</label>
-        <select id="s-onetone-yn" onchange="updateOnetoneFields()">
-          <option value="0">없음</option>
-          <option value="1">있음</option>
-        </select>
-      </div>
-      <div class="form-group" id="s-ot-paytype-group" style="display:none;"><label>1:1 수납방식</label>
-        <select id="s-ot-paytype">
-          <option value="분기">분기납</option>
-          <option value="월납">월납</option>
-        </select>
-      </div>
-      <div class="form-group" id="s-ot-days-group" style="display:none;"><label>1:1 수업 요일</label>
+      <div class="form-group"><label>1:1 수업 요일 <span class="text-xs text-muted">(대시보드 표시용 · 청구는 1회성으로)</span></label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
           <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="ot-day-check" value="월"> 월</label>
           <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="ot-day-check" value="화"> 화</label>
@@ -1288,19 +1276,7 @@ function calcBilling(s,month){
   }
   const material = material_alt + science + snack; // 합계 (총합계 계산용)
   const care=getCare(s);
-  let onetone = 0;
-  if(s.onetone>0){
-    const fi = M().feeItems||{};
-    if(s.otPayType==='월납'){
-      const item = Object.values(fi).find(v=>v.type==='onetone'&&v.condition?.paytype==='월납');
-      onetone = item?.amount||160000;
-    } else {
-      if(isQM(month)){
-        const item = Object.values(fi).find(v=>v.type==='onetone'&&v.condition?.paytype==='분기납');
-        onetone = item?.amount||480000;
-      }
-    }
-  }
+  const onetone = 0; // 1:1은 1회성 항목으로만 청구 — 자동 계산 없음
   const total=tuition+shuttle+textbook_pkg+ext_textbook+material+care+onetone;
   return{tuition,sibling,shuttle,textbook_pkg,ext_textbook,material,material_alt,science,snack,care,onetone,total};
 }
@@ -1365,6 +1341,20 @@ async function init(){
     // localStorage도 동기화
     localStorage.setItem(getYearKey(currentYear), JSON.stringify(CY));
     localStorage.setItem('current_year', String(currentYear));
+    // 1:1 분기납 로직 변경으로 인해 기존 billings preview 초기화 (마감된 것 제외)
+    if(CY.billings){
+      let previewCleared = false;
+      Object.keys(CY.billings).forEach(ym=>{
+        if(!CY.billings[ym].closed && CY.billings[ym].preview){
+          delete CY.billings[ym].preview;
+          previewCleared = true;
+        }
+      });
+      if(previewCleared){
+        fbSave('data_'+currentYear+'/billings', CY.billings).catch(()=>{});
+        localStorage.setItem(getYearKey(currentYear), JSON.stringify(CY));
+      }
+    }
   } catch(e){ console.warn('Firebase 로드 실패:', e); }
   hideLoadingOverlay();
 
@@ -1458,10 +1448,7 @@ function renderDashboard(viewMonth){
   const monthFlags = [];
   if(isQM(m)) monthFlags.push(`${m}월 분기월 — 셔틀비·교재비 청구 포함`);
   if(isSM(m)) monthFlags.push(`${m}월 반기월 — 알티오라 재료비 720,000원 포함`);
-  if(isQM(m)){
-    const otStudents = active.filter(s=>s.onetone>0);
-    if(otStudents.length) monthFlags.push(`1:1 수업 분기 청구 (${otStudents.length}명)`);
-  }
+  // 1:1은 1회성으로 처리 — 분기 청구 항목 제거
   sections.push({
     icon:'📅', label:'이달 청구 유형', color:'var(--yellow)',
     count: monthFlags.length,
@@ -1545,24 +1532,28 @@ function renderDashboard(viewMonth){
   }).filter(Boolean).join('') || `<div class="text-muted text-sm">없음</div>`;
 
   // ── 1:1 수업 현황 (요일별)
-  const otStudentsAll = active.filter(s=>s.onetone>0 && s.otDays);
+  // otDays 등록된 원생만 표시
+  const otStudentsAll = active.filter(s=>s.otDays);
   const otEl = document.getElementById('ot-summary');
   const otCountEl = document.getElementById('ot-count-label');
   if(otCountEl) otCountEl.textContent = `${otStudentsAll.length}명`;
 
-  const OT_DAY = {월:[],화:[],수:[],목:[],금:[]};
+  const OT_DAY = {월:[],화:[],수:[],목:[],금:[],미지정:[]};
   otStudentsAll.forEach(s=>{
-    const days = (s.otDays||'').split(/[,·]+/).map(d=>d.trim()).filter(d=>OT_DAY[d]);
-    days.forEach(d=>OT_DAY[d].push(s));
+    const days = (s.otDays||'').split(/[,·]+/).map(d=>d.trim()).filter(d=>['월','화','수','목','금'].includes(d));
+    if(days.length) days.forEach(d=>OT_DAY[d].push(s));
+    else OT_DAY['미지정'].push(s);
   });
   if(otEl) otEl.innerHTML = Object.entries(OT_DAY).map(([day,list])=>{
     const unique=[...new Map(list.map(s=>[s.id,s])).values()];
     if(!unique.length) return '';
+    const color = day==='미지정' ? 'var(--yellow)' : 'var(--green)';
+    const bg    = day==='미지정' ? 'var(--yellow-bg)' : 'var(--green-dim)';
     return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
-      <span style="min-width:20px;font-size:12px;font-weight:700;color:var(--green);">${day}</span>
+      <span style="min-width:20px;font-size:12px;font-weight:700;color:${color};">${day}</span>
       ${unique.map(s=>`<span onclick="openStudentModal(S().findIndex(x=>x.id==='${s.id}'))"
-        style="background:var(--green-dim);color:var(--green);border-radius:5px;
-        padding:2px 7px;font-size:12px;cursor:pointer;">${s.name}</span>`).join('')}
+        style="background:${bg};color:${color};border-radius:5px;
+        padding:2px 7px;font-size:12px;cursor:pointer;" title="${s.cls}">${s.name}</span>`).join('')}
     </div>`;
   }).filter(Boolean).join('') || `<div class="text-muted text-sm">없음</div>`;
 }
@@ -1593,6 +1584,7 @@ function toggleAccordion(idx){
 // BILLING
 // ══════════════════════════════════════════════
 let currentBilling=[],currentBillingMonth=0;
+let otRowMap = {}; // 전역 — renderBillingTable에서 갱신, showExtraItemsPopup에서 참조
 // 차감 데이터: { studentId: {days, rate, amount, reason, memo} }
 let deductions={};
 function restoreLastBilling(){
@@ -1918,7 +1910,13 @@ function renderBillingTable(){
   const hasSci=isQ && rows.some(x=>x.s.brand==='petamus');  // 페타무스 과학재료비
   const hasSnack=isQ && rows.some(x=>x.s.brand==='petamus'); // 페타무스 간식비
   const hasCare=rows.some(x=>x.a.care>0);
-  const hasOT=rows.some(x=>x.a.onetone>0);
+  // 1:1 컬럼: onetimeRows에 1:1 항목이 있는 원생이 있으면 표시
+  otRowMap = {}; // 전역 갱신
+  onetimeRows.filter(r=>r.sid).forEach(r=>{
+    if(!otRowMap[r.sid]) otRowMap[r.sid]=[];
+    otRowMap[r.sid].push(r);
+  });
+  const hasOT = Object.keys(otRowMap).length > 0;
   document.getElementById('billing-thead').innerHTML=`<tr style="background:var(--surface2,#f0eff8);">
     <th>브랜드</th><th>반</th>
     <th>원생명</th>
@@ -1930,8 +1928,8 @@ function renderBillingTable(){
     ${hasSci?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('science')">과학재료비${billingFilters.item==='science'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
     ${hasSnack?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('snack')">간식비${billingFilters.item==='snack'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
     ${hasCare?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('care')" title="돌봄 있는 원생만 보기">돌봄${billingFilters.item==='care'?' ✓':' ▾'}</th>`:''}
-    ${hasOT?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('onetone')" title="1:1 있는 원생만 보기">1:1${billingFilters.item==='onetone'?' ✓':' ▾'}</th>`:''}
-    <th class="text-right">최종 합계</th><th>비고</th></tr>`;
+    ${hasOT?`<th class="text-right">추가비용</th>`:''}
+    <th class="text-right">최종 합계</th><th>비고</th><th style="width:32px;"></th></tr>`;
   if(!rows.length){document.getElementById('billing-tbody').innerHTML=`<tr><td colspan="12"><div class="empty-state text-muted text-sm">해당 조건 원생 없음</div></td></tr>`;document.getElementById('billing-class-summary').innerHTML='';return;}
   document.getElementById('billing-tbody').innerHTML=rows.map(({s,a})=>{
     const flags=[];
@@ -1974,14 +1972,31 @@ function renderBillingTable(){
       ${hasSci?`<td class="mono text-right">${a.science?won(a.science):'<span class="text-muted">-</span>'}</td>`:''}
       ${hasSnack?`<td class="mono text-right">${a.snack?won(a.snack):'<span class="text-muted">-</span>'}</td>`:''}
       ${hasCare?`<td class="mono text-right">${a.care?won(a.care):'<span class="text-muted">-</span>'}</td>`:''}
-      ${hasOT?`<td class="mono text-right">${a.onetone?won(a.onetone):'<span class="text-muted">-</span>'}</td>`:''}
+      ${hasOT?`<td class="mono text-right">${(()=>{
+        const otItems = otRowMap[s.id];
+        if(!otItems||!otItems.length) return '<span class="text-muted">-</span>';
+        const total = otItems.reduce((a,r)=>a+(r.amount||0),0);
+        return `<span onclick="showExtraItemsPopup('${s.id}',this)" title="클릭하여 항목 보기"
+          style="cursor:pointer;color:var(--accent2);font-weight:700;text-decoration:underline dotted;">${won(total)}</span>`;
+      })()}</td>`:''}
+
       <td class="mono text-right amount-total">${(()=>{
         const d = deductions[s.id]?.amount||0;
         const effSib = d>0 ? 0 : (a.sibling||0);
         const cancelledSib = d>0 ? (a.sibling||0) : 0;
-        return won(a.total - d + cancelledSib);
+        const otAmt = (otRowMap[s.id]||[]).reduce((sum,r)=>sum+(r.amount||0),0);
+        return won(a.total - d + cancelledSib + otAmt);
       })()}</td>
-      <td style="white-space:nowrap;">${flags.join(' ')}</td></tr>`;
+      <td style="white-space:nowrap;">${flags.join(' ')}</td>
+      <td style="text-align:center;position:relative;">
+        <button onclick="toggleRowAddMenu('${s.id}',this)"
+          style="display:inline-flex;align-items:center;justify-content:center;
+          width:22px;height:22px;border-radius:6px;
+          border:1px solid var(--border);background:var(--surface2);
+          color:var(--text2);font-size:14px;cursor:pointer;line-height:1;
+          font-family:inherit;"
+          title="${s.name}에 추가비용">+</button>
+      </td></tr>`;
   }).join('');
   const ct={};
   rows.forEach(({s,a})=>{
@@ -2009,7 +2024,7 @@ function renderBillingTable(){
   const grandSci = Object.values(ct).reduce((s,v)=>s+v.science,0);
   const grandSnack = Object.values(ct).reduce((s,v)=>s+v.snack,0);
   const grandCare = Object.values(ct).reduce((s,v)=>s+v.care,0);
-  const grandOT = Object.values(ct).reduce((s,v)=>s+v.onetone,0);
+  const grandOT = Object.values(otRowMap).flat().reduce((a,r)=>a+(r.amount||0),0);
   const totalCount = Object.values(ct).reduce((s,v)=>s+v.count,0);
 
   const subtitleStyle = 'background:var(--surface2);font-weight:700;font-size:12px;color:var(--text2);padding:8px 12px;text-align:right;border-top:2px solid var(--border);';
@@ -2026,9 +2041,10 @@ function renderBillingTable(){
     ${hasSci?`<td style="${subtitleStyle}">${grandSci?won(grandSci):'-'}</td>`:''}
     ${hasSnack?`<td style="${subtitleStyle}">${grandSnack?won(grandSnack):'-'}</td>`:''}
     ${hasCare?`<td style="${subtitleStyle}">${grandCare?won(grandCare):'-'}</td>`:''}
-    ${hasOT?`<td style="${subtitleStyle}">${grandOT?won(grandOT):'-'}</td>`:''}
+    ${hasOT?`<td style="${totalStyle}">${grandOT?won(grandOT):'-'}</td>`:''}
     <td style="${totalStyle}">${won(grandTotal)}</td>
     <td style="${labelStyle}"></td>
+    <td></td>
   </tr>`;
   document.getElementById('billing-tbody').innerHTML += subtotalRow;
   document.getElementById('billing-class-summary').innerHTML='';
@@ -2203,14 +2219,7 @@ function updateCareFields(){
   const group = document.getElementById('s-care-days-group');
   if(group) group.style.display = care && care!=='없음' ? '' : 'none';
 }
-function updateOnetoneFields(){
-  const yn = document.getElementById('s-onetone-yn')?.value;
-  const isYes = yn==='1';
-  const ptGroup = document.getElementById('s-ot-paytype-group');
-  const daysGroup = document.getElementById('s-ot-days-group');
-  if(ptGroup) ptGroup.style.display = isYes ? '' : 'none';
-  if(daysGroup) daysGroup.style.display = isYes ? '' : 'none';
-}
+function updateOnetoneFields(){} // 레거시 — 모달에서 1:1 yn/paytype 제거됨
 function updateBrandFields(){
   const b=document.getElementById('s-brand').value;
   document.getElementById('s-htime-group').style.display=b==='altiora'?'flex':'none';
@@ -2332,17 +2341,15 @@ function openStudentModal(idx=-1){
   updateShuttleHalf();
   document.getElementById('s-shuttle-half').checked = !!s?.shuttleHalf;
   v('s-care',s?.care||'없음');
-  // 1:1: onetone>0이면 있음, 기존 금액값도 있음으로 처리
-  const otYn = (s?.onetone && parseInt(s.onetone)>0) ? '1' : '0';
-  document.getElementById('s-onetone-yn').value = otYn;
   const otDaysVal = s?.otDays||'';
   document.getElementById('s-ot-days').value = otDaysVal;
   document.querySelectorAll('.ot-day-check').forEach(cb=>{
     cb.checked = otDaysVal.split(',').map(d=>d.trim()).includes(cb.value);
-    cb.addEventListener('change', ()=>{
-      document.getElementById('s-ot-days').value = 
+    // onchange로 교체 — addEventListener는 모달 열 때마다 중복 누적됨
+    cb.onchange = ()=>{
+      document.getElementById('s-ot-days').value =
         Array.from(document.querySelectorAll('.ot-day-check:checked')).map(c=>c.value).join(',');
-    });
+    };
   });
   updateCareFields(); updateOnetoneFields();v('s-receipt',s?.receipt||'항상발급');
   // 돌봄 요일 체크 복원
@@ -2388,9 +2395,10 @@ function saveStudent(){
     siblingId:document.getElementById('s-sibling').checked?(document.getElementById('s-sibling-id').value||''):'',
     care:document.getElementById('s-care').value,
     careDays:Array.from(document.querySelectorAll('.care-day-check:checked')).map(c=>c.value),careOverride:'',
-    onetone:document.getElementById('s-onetone-yn')?.value==='1'?1:0,
+    onetone:0,
+    otDays:document.getElementById('s-ot-days')?.value||'',
     customTuition:0,
-    otPayType:document.getElementById('s-ot-paytype')?.value||'분기',
+    otPayType:'',
     receipt:document.getElementById('s-receipt').value,sms:document.getElementById('s-sms').value,
     split:document.getElementById('s-split').checked,noFee:document.getElementById('s-no-fee').checked,memo:document.getElementById('s-memo').value.trim(),leaveMonth:document.getElementById('s-leave-month')?.value||'',
     active:editSIdx>=0?S()[editSIdx].active:true
@@ -3432,6 +3440,14 @@ function generateSelectedUnpaidSms() {
 // ══════════════════════════════════════════════
 let onetimeRows = [];
 
+// 1:1 단가 조회 헬퍼: months=1 → 월납단가, months=3 → 3배
+function getOtAmt(months){
+  const fi = M().feeItems||{};
+  const base = Object.values(fi).find(v=>v.type==='onetone'&&v.condition?.paytype==='월납');
+  const unit = base?.amount||160000;
+  return unit * months;
+}
+
 function addOnetimeRow(sid='', item='AR비용', amount=0) {
   onetimeRows.push({id:'ot'+Date.now()+Math.random(), sid, item, amount});
   renderOnetimeRows();
@@ -3440,14 +3456,9 @@ function addOnetimeRow(sid='', item='AR비용', amount=0) {
 function autoFillOnetimeAmt(id, item){
   const fi = M().feeItems||{};
   let amt = 0;
-  if(item==='1:1 수업(월납)'){
-    const v = Object.values(fi).find(v=>v.type==='onetone'&&v.condition?.paytype==='월납');
-    amt = v?.amount||160000;
-  } else if(item==='1:1 수업(분기납)'){
-    const v = Object.values(fi).find(v=>v.type==='onetone'&&v.condition?.paytype==='분기납');
-    amt = v?.amount||480000;
-  } else {
-    // 1회성 항목 — label로 매칭
+  if(item==='1:1 1개월') amt = getOtAmt(1);
+  else if(item==='1:1 3개월') amt = getOtAmt(3);
+  else {
     const v = Object.values(fi).find(v=>v.type==='onetime'&&v.label===item);
     amt = v?.amount||0;
   }
@@ -3460,11 +3471,23 @@ function removeOnetimeRow(id) {
   onetimeRows = onetimeRows.filter(r=>r.id!==id);
   renderOnetimeRows();
   updateBillingTotals();
+  // + 버튼 팝업 재렌더
+  if(_rowMenuSid && document.getElementById('row-add-popup')){
+    const btn = _rowMenuBtn;
+    const sid = _rowMenuSid;
+    _rowMenuSid = null;
+    toggleRowAddMenu(sid, btn);
+  }
+  // 항목 팝업 닫기 — 테이블 재렌더로 el 참조가 바뀌므로 그냥 제거
+  const ep = document.getElementById('extra-items-popup');
+  if(ep) { ep.remove(); }
 }
 
 function renderOnetimeRows() {
   const el = document.getElementById('onetime-rows');
   if(!el) return;
+  // 1:1 항목 변경 시 청구 테이블 컬럼도 갱신
+  if(currentBilling.length) renderBillingTable();
   if(!onetimeRows.length){
     el.innerHTML='<div class="text-sm text-muted" style="padding:4px 0;">추가된 항목 없음</div>';
     document.getElementById('onetime-total').textContent='';
@@ -3479,10 +3502,9 @@ function renderOnetimeRows() {
       </select>
       <select onchange="updateOnetimeRow('${row.id}','item',this.value);autoFillOnetimeAmt('${row.id}',this.value)" style="font-size:12px;padding:5px 8px;max-width:130px;">
         ${[
-          'AR비용',
-          ...(Object.values(M().feeItems||{}).filter(v=>v.type==='onetone').map(v=>`1:1 수업(${v.condition?.paytype||''})`)),
+          '1:1 1개월','1:1 3개월',
           ...(Object.values(M().feeItems||{}).filter(v=>v.type==='onetime').map(v=>v.label)),
-          '기타'
+          'AR비용','기타'
         ].filter((v,i,a)=>a.indexOf(v)===i).map(i=>`<option ${row.item===i?'selected':''}>${i}</option>`).join('')}
       </select>
       <input type="number" value="${row.amount}" min="0" step="10000"
@@ -3761,6 +3783,181 @@ function addFeeItem(brand, type){
   });
 })();
 // ── /드래그 선택 합계 ──
+
+// ── 행별 추가비용 + 버튼 팝업 ──
+let _rowMenuSid = null;
+let _rowMenuBtn = null;
+
+function showExtraItemsPopup(sid, el) {
+  const existing = document.getElementById('extra-items-popup');
+  if(existing){ existing.remove(); return; }
+
+  const items = (otRowMap[sid]||[]);
+  const s = S().find(x=>x.id===sid);
+  // 항목 없거나 el이 DOM에 없으면 팝업 열지 않음
+  if(!items.length || !s) return;
+  const rect = el.getBoundingClientRect();
+  if(!rect.width && !rect.height) return; // el이 DOM에서 사라진 경우
+
+  const popup = document.createElement('div');
+  popup.id = 'extra-items-popup';
+  popup.style.cssText = `
+    position:fixed;z-index:9001;
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:var(--radius);padding:8px;
+    box-shadow:0 4px 16px rgba(26,31,54,.14);
+    min-width:200px;max-width:260px;
+  `;
+
+  popup.innerHTML = `
+    <div style="font-size:11px;font-weight:600;color:var(--text3);padding:2px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+      ${s.name} 추가비용 항목
+    </div>
+    ${items.map(r=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:6px 8px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border);">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.item}</span>
+        <span style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px;">
+          <span class="mono" style="color:var(--accent2);font-weight:700;">${won(r.amount)}</span>
+          <span onclick="event.stopPropagation();removeOnetimeRow('${r.id}')"
+            style="cursor:pointer;color:var(--red);font-size:13px;line-height:1;" title="삭제">✕</span>
+        </span>
+      </div>`).join('')}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px 2px;font-size:12px;">
+      <span style="color:var(--text3);">합계</span>
+      <span class="mono" style="font-weight:700;color:var(--accent2);">${won(items.reduce((a,r)=>a+(r.amount||0),0))}</span>
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+  const pw = popup.offsetWidth;
+  const ph = popup.offsetHeight;
+  let top = rect.bottom + 4;
+  let left = rect.right - pw;
+  if(top + ph > window.innerHeight - 10) top = rect.top - ph - 4;
+  if(left < 4) left = 4;
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+
+  setTimeout(()=>{
+    document.addEventListener('click', function _close(e){
+      if(!popup.contains(e.target) && e.target !== el){
+        popup.remove();
+        document.removeEventListener('click', _close);
+      }
+    });
+  }, 0);
+}
+
+function toggleRowAddMenu(sid, btn) {
+  const existing = document.getElementById('row-add-popup');
+  if(existing) existing.remove();
+  if(_rowMenuSid === sid) { _rowMenuSid = null; _rowMenuBtn = null; return; }
+
+  _rowMenuSid = sid;
+  _rowMenuBtn = btn;
+  const s = S().find(x=>x.id===sid);
+  if(!s) return;
+
+  const popup = document.createElement('div');
+  popup.id = 'row-add-popup';
+  popup.style.cssText = `
+    position:fixed;z-index:9000;
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:var(--radius);padding:8px;
+    box-shadow:0 4px 16px rgba(26,31,54,.14);
+    min-width:200px;max-width:260px;
+  `;
+
+  // 이 원생의 기존 추가비용 전체
+  const existing_items = onetimeRows.filter(r=>r.sid===sid);
+  const existingHTML = existing_items.length
+    ? `<div style="font-size:11px;color:var(--text3);padding:2px 8px 4px;">추가된 항목</div>`
+      + existing_items.map(r=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:5px 8px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border);">
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.item}</span>
+          <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:8px;">
+            <span class="mono" style="color:var(--accent2);">${won(r.amount)}</span>
+            <span onclick="removeOnetimeRow('${r.id}')" style="cursor:pointer;color:var(--red);font-size:13px;line-height:1;">✕</span>
+          </span>
+        </div>`).join('')
+    : '';
+
+  // feeItems의 onetime 항목만
+  const fi = M().feeItems||{};
+  const presetItems = Object.values(fi)
+    .filter(v=>v.type==='onetime')
+    .map(v=>({label:v.label, amount:v.amount}));
+
+  popup.innerHTML = `
+    <div style="font-size:11px;font-weight:600;color:var(--text3);padding:2px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+      ${s.name} 추가비용
+    </div>
+    ${existingHTML}
+    <div style="padding-top:${existing_items.length?'6px':'0'};">
+      <div style="font-size:11px;color:var(--text3);padding:2px 8px 4px;">항목 추가</div>
+      ${presetItems.map(it=>`
+        <button onclick="rowAddItem('${sid}','${it.label.replace(/'/g,"&#39;")}',${it.amount})"
+          class="btn btn-secondary btn-sm"
+          style="width:100%;margin-bottom:3px;text-align:left;justify-content:space-between;display:flex;">
+          <span>${it.label}</span>
+          <span class="mono" style="color:var(--text2);font-size:11px;">${won(it.amount)}</span>
+        </button>`).join('')}
+      <button onclick="rowAddCustom('${sid}')"
+        class="btn btn-secondary btn-sm"
+        style="width:100%;margin-top:2px;text-align:left;justify-content:flex-start;border-style:dashed;">
+        + 직접 입력
+      </button>
+    </div>
+  `;
+
+  // 버튼 위치 기준으로 팝업 배치
+  const rect = btn.getBoundingClientRect();
+  document.body.appendChild(popup);
+  const pw = popup.offsetWidth;
+  const ph = popup.offsetHeight;
+  let top = rect.bottom + 4;
+  let left = rect.right - pw;
+  if(top + ph > window.innerHeight - 10) top = rect.top - ph - 4;
+  if(left < 4) left = 4;
+  popup.style.top = top + 'px';
+  popup.style.left = left + 'px';
+
+  // 외부 클릭 닫기
+  setTimeout(()=>{
+    document.addEventListener('click', function _close(e){
+      if(!popup.contains(e.target) && e.target !== btn){
+        popup.remove();
+        _rowMenuSid = null;
+        document.removeEventListener('click', _close);
+      }
+    });
+  }, 0);
+}
+
+function rowAddItem(sid, item, amount) {
+  addOnetimeRow(sid, item, amount);
+  const popup = document.getElementById('row-add-popup');
+  if(popup) popup.remove();
+  _rowMenuSid = null;
+  toast(`${S().find(x=>x.id===sid)?.name} — ${item} 추가됨`);
+}
+
+function rowAddCustom(sid) {
+  const popup = document.getElementById('row-add-popup');
+  if(popup) popup.remove();
+  _rowMenuSid = null;
+  const s = S().find(x=>x.id===sid);
+  if(!s) return;
+  // 1회성 섹션에 원생 지정해서 빈 행 추가
+  addOnetimeRow(sid, '기타', 0);
+  // 1회성 섹션으로 스크롤
+  const el = document.getElementById('onetime-section');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'nearest'});
+  toast(`${s.name} — 기타 항목 추가. 아래 금액을 입력해주세요.`, 'info', 3500);
+}
+// ── /행별 추가비용 + 버튼 팝업 ──
 
 function toast(msg, type='success', duration=2800) {
   const icons = {success:'✅', error:'❌', info:'ℹ️', warn:'⚠️'};
