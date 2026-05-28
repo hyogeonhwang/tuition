@@ -2304,7 +2304,7 @@ function saveStudent(){
     active:editSIdx>=0?S()[editSIdx].active:true
   };
   if(editSIdx>=0)CY.students[editSIdx]=s;else CY.students.push(s);
-  saveYearData();closeModal('modal-student');renderStudentTable();renderDashboard();
+  saveYearData();closeModal('modal-student');renderStudentTable();renderDashboard();renderSpecialList('all');
   toast(editSIdx>=0?`${s.name} 원생 정보가 수정되었습니다.`:`${s.name} 원생이 추가되었습니다.`);
 }
 function toggleActive(idx){
