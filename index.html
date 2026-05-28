@@ -1109,6 +1109,13 @@ async function loadYearDataFromFB(y){
   try {
     const data = await fbGet('data_'+y);
     if(data){
+      // Firebase는 배열을 객체로 저장 → 배열로 정규화
+      if(data.students && !Array.isArray(data.students))
+        data.students = Object.values(data.students);
+      if(data.textbooks && !Array.isArray(data.textbooks))
+        data.textbooks = Object.values(data.textbooks);
+      if(data.tbMaster && !Array.isArray(data.tbMaster))
+        data.tbMaster = Object.values(data.tbMaster);
       // freq 마이그레이션: 'kelpie' → '3'
       (data.students||[]).forEach(st=>{ if(st.freq==='kelpie') st.freq='3'; });
       // freq 마이그레이션: 반 이름 기준 자동 보정
@@ -1341,20 +1348,7 @@ async function init(){
     // localStorage도 동기화
     localStorage.setItem(getYearKey(currentYear), JSON.stringify(CY));
     localStorage.setItem('current_year', String(currentYear));
-    // 1:1 분기납 로직 변경으로 인해 기존 billings preview 초기화 (마감된 것 제외)
-    if(CY.billings){
-      let previewCleared = false;
-      Object.keys(CY.billings).forEach(ym=>{
-        if(!CY.billings[ym].closed && CY.billings[ym].preview){
-          delete CY.billings[ym].preview;
-          previewCleared = true;
-        }
-      });
-      if(previewCleared){
-        fbSave('data_'+currentYear+'/billings', CY.billings).catch(()=>{});
-        localStorage.setItem(getYearKey(currentYear), JSON.stringify(CY));
-      }
-    }
+    // preview 자동삭제 코드 제거 (1:1 분기납 로직 완전 제거됨)
   } catch(e){ console.warn('Firebase 로드 실패:', e); }
   hideLoadingOverlay();
 
@@ -1589,18 +1583,18 @@ let otRowMap = {}; // 전역 — renderBillingTable에서 갱신, showExtraItems
 let deductions={};
 function restoreLastBilling(){
   const billings = CY.billings||{};
-  // ts 없는 preview에 ym 기반 ts 보정
   Object.keys(billings).forEach(ym=>{
-    if(billings[ym].preview && !billings[ym].preview.ts){
+    if(billings[ym].preview && !billings[ym].preview.ts)
       billings[ym].preview.ts = parseInt(ym);
-    }
   });
-  const yms = Object.keys(billings).sort().reverse();
-  // ts 기준 가장 최근 preview 찾기
-  // 마지막으로 조회한 월 우선 사용
+
+  // 1순위: 마지막으로 조회한 월
   const lastYm = localStorage.getItem('last_billing_ym');
-  let latestYm = (lastYm && billings[lastYm]) ? lastYm : null;
+  let latestYm = lastYm || null;
+
+  // 2순위: billings에 기록된 가장 최근 마감/preview
   if(!latestYm){
+    const yms = Object.keys(billings).sort().reverse();
     let latestTs = 0;
     for(const ym of yms){
       const b = billings[ym];
@@ -1611,13 +1605,18 @@ function restoreLastBilling(){
       }
     }
   }
-  if(latestYm){
-    const year = parseInt(latestYm.slice(0,4));
-    const month = parseInt(latestYm.slice(4));
-    document.getElementById('billing-year').value = year;
-    document.getElementById('billing-month').value = month;
-    generateBilling(true);
+
+  // 3순위: 현재 연월로 기본 복원
+  if(!latestYm){
+    const now = new Date();
+    latestYm = String(now.getFullYear()) + String(now.getMonth()+1).padStart(2,'0');
   }
+
+  const year = parseInt(latestYm.slice(0,4));
+  const month = parseInt(latestYm.slice(4));
+  document.getElementById('billing-year').value = year;
+  document.getElementById('billing-month').value = month;
+  generateBilling(true);
 }
 function generateBilling(silent=false){
   const btn = document.getElementById('btn-generate');
