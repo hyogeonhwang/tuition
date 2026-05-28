@@ -182,6 +182,11 @@ tr.inactive td{opacity:.38;}
 .toast-msg     { flex:1; line-height:1.4; }
 @keyframes toastIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
 @keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateX(20px)} }
+.calc-btn{padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);font-size:16px;cursor:pointer;font-weight:500;transition:background .1s;}
+.calc-btn:hover{background:var(--border);}
+.calc-btn.calc-op{background:#fff3e0;color:#e65100;font-weight:700;}
+.calc-btn.calc-eq{background:var(--accent);color:#fff;font-weight:700;}
+.calc-btn.calc-fn{background:var(--surface3,#e8e8f0);color:var(--text2);}
 </style>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -305,26 +310,26 @@ tr.inactive td{opacity:.38;}
           <div><div class="card-title" id="billing-result-title"></div><div class="card-sub" id="billing-result-sub"></div></div>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
-          <span class="text-sm text-muted">필터</span>
-          <select id="bf-brand" onchange="onBillingBrandChange()" style="font-size:12px;padding:5px 10px;max-width:110px;">
+          <select id="bf-brand" onchange="onBillingBrandChange()" style="font-size:12px;padding:5px 8px;max-width:110px;">
             <option value="">전체 브랜드</option>
             <option value="altiora">알티오라</option>
             <option value="pangram">팬그램</option>
             <option value="petamus">페타무스</option>
           </select>
-          <select id="bf-class" onchange="renderBillingTable()" style="font-size:12px;padding:5px 10px;max-width:150px;">
+          <select id="bf-class" onchange="renderBillingTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
             <option value="">전체 반</option>
           </select>
           <div style="position:relative;">
-            <input type="text" id="bf-search" placeholder="이름 검색..." oninput="renderBillingTable();document.getElementById('bf-search-clear').style.display=this.value?'flex':'none';"
-              style="font-size:12px;padding:5px 26px 5px 28px;border:1px solid var(--border);border-radius:6px;width:130px;background:var(--surface);">
-            <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;">🔍</span>
+            <input type="text" id="bf-search" placeholder="🔍 이름 검색..." oninput="renderBillingTable();document.getElementById('bf-search-clear').style.display=this.value?'flex':'none';"
+              style="font-size:12px;padding:5px 26px 5px 10px;border:1px solid var(--border);border-radius:6px;width:130px;background:var(--surface);">
             <span id="bf-search-clear" onclick="document.getElementById('bf-search').value='';renderBillingTable();this.style.display='none';"
               style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;align-items:center;">✕</span>
           </div>
+          <input type="hidden" id="bf-item" value="">
+          <button id="bf-clear-all" onclick="clearAllBillingFilters()" style="display:none;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--warn-bg,#fef3dc);cursor:pointer;color:var(--text2);">✕ 필터 초기화</button>
         </div>
         <div class="table-wrap" style="max-height:60vh;overflow-y:auto;"><table><thead id="billing-thead" style="position:sticky;top:0;z-index:10;"></thead><tbody id="billing-tbody"></tbody></table></div>
-        <div id="billing-class-summary" style="margin-top:12px;"></div>
+        <div id="billing-class-summary" style="margin-top:0;"></div>
 
         <!-- 이달 1회성 추가비용 -->
         <div id="onetime-section" style="margin-top:16px;border-top:2px solid var(--border);padding-top:14px;">
@@ -410,28 +415,64 @@ tr.inactive td{opacity:.38;}
 
     <!-- EXTERNAL TEXTBOOK -->
     <div class="page" id="page-textbook">
-      <div class="info-box">📚 반별 분기 외부교재비를 입력하세요. 분기월(2,5,8,11월) 청구 시 자동 반영됩니다.</div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">외부교재비 설정</div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <select id="tb-filter-brand" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:110px;">
-              <option value="">전체 브랜드</option>
-              <option value="altiora">알티오라</option>
-              <option value="pangram">팬그램</option>
-              <option value="petamus">페타무스</option>
-            </select>
-            <select id="tb-filter-cls" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
-              <option value="">전체 반</option>
-            </select>
-            <button class="btn btn-primary btn-sm" onclick="openTextbookModal()">+ 추가</button>
+      <div class="tabs" style="margin-bottom:16px;">
+        <div class="tab active" id="tb-tab-assign" onclick="switchTbTab('assign',this)">반별 교재비 설정</div>
+        <div class="tab" id="tb-tab-master" onclick="switchTbTab('master',this)">교재 마스터</div>
+      </div>
+
+      <!-- 반별 교재비 설정 탭 -->
+      <div id="tb-pane-assign">
+        <div class="info-box">📚 반별 분기 외부교재비를 입력하세요. 분기월(2,5,8,11월) 청구 시 자동 반영됩니다.</div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">반별 교재비 설정</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="tb-filter-brand" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:110px;">
+                <option value="">전체 브랜드</option>
+                <option value="altiora">알티오라</option>
+                <option value="pangram">팬그램</option>
+                <option value="petamus">페타무스</option>
+              </select>
+              <select id="tb-filter-cls" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
+                <option value="">전체 반</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="openTextbookModal()">+ 추가</button>
+              <button class="btn btn-secondary btn-sm" onclick="openTbFromMaster()">📚 교재 마스터에서 배정</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>브랜드</th><th>반</th><th>수납유형</th><th class="text-right">1분기(3~5월)</th><th class="text-right">2분기(6~8월)</th><th class="text-right">3분기(9~11월)</th><th class="text-right">4분기(12~2월)</th><th></th></tr></thead>
+              <tbody id="textbook-tbody"></tbody>
+            </table>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>브랜드</th><th>반</th><th>수납유형</th><th class="text-right">1분기(3~5월)</th><th class="text-right">2분기(6~8월)</th><th class="text-right">3분기(9~11월)</th><th class="text-right">4분기(12~2월)</th><th></th></tr></thead>
-            <tbody id="textbook-tbody"></tbody>
-          </table>
+      </div>
+
+      <!-- 교재 마스터 탭 -->
+      <div id="tb-pane-master" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">교재 마스터</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="tbm-search" placeholder="교재명 검색..." oninput="renderTbMaster()"
+                style="font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;width:160px;">
+              <select id="tbm-filter-brand" onchange="renderTbMaster()" style="font-size:12px;padding:5px 8px;">
+                <option value="">전체 브랜드</option>
+                <option value="altiora">알티오라</option>
+                <option value="pangram">팬그램</option>
+                <option value="petamus">페타무스</option>
+                <option value="공통">공통</option>
+              </select>
+              <button class="btn btn-primary btn-sm" onclick="openTbMasterModal()">+ 교재 등록</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>브랜드</th><th>교재명</th><th class="text-right">구매가</th><th class="text-right">판매가</th><th></th></tr></thead>
+              <tbody id="tbmaster-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -499,13 +540,33 @@ tr.inactive td{opacity:.38;}
     </div>
     <div class="section-label">셔틀 / 수납</div>
     <div class="form-row">
-      <div class="form-group"><label>셔틀</label><select id="s-shuttle"><option value="왕복">왕복</option><option value="등원편도">등원편도</option><option value="하원편도">하원편도</option><option value="개별">개별(미탑승)</option></select></div>
+      <div class="form-group"><label>셔틀</label>
+        <select id="s-shuttle" onchange="updateShuttleHalf()">
+          <option value="왕복">왕복</option>
+          <option value="등원편도">등원편도</option>
+          <option value="하원편도">하원편도</option>
+          <option value="개별">개별(미탑승)</option>
+        </select>
+        <div id="shuttle-half-row" style="display:none;margin-top:6px;">
+          <label class="checkbox-row" style="font-size:12px;">
+            <input type="checkbox" id="s-shuttle-half"> 운영사정 편도 (셔틀비 50% 적용)
+          </label>
+        </div>
+      </div>
       <div class="form-group"><label>수납 유형</label><select id="s-paytype"><option value="월납">월납</option><option value="3개월">3개월 선납</option><option value="6개월">6개월 선납</option></select></div>
     </div>
     <div class="section-label">돌봄 / 1:1</div>
     <div class="form-row">
       <div class="form-group"><label>돌봄</label><select id="s-care" onchange="updateCareFields()"><option value="없음">없음</option><option value="1회">1회 — 10,000원</option><option value="주3회">주3회 — 120,000원</option><option value="주4회">주4회 — 150,000원</option><option value="주5회">주5회 — 180,000원</option></select></div>
-
+      <div class="form-group" id="s-care-days-group" style="display:none;"><label>돌봄 요일</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="care-day-check" value="월"> 월</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="care-day-check" value="화"> 화</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="care-day-check" value="수"> 수</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="care-day-check" value="목"> 목</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="care-day-check" value="금"> 금</label>
+        </div>
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>1:1 수업</label>
@@ -519,6 +580,16 @@ tr.inactive td{opacity:.38;}
           <option value="분기">분기납</option>
           <option value="월납">월납</option>
         </select>
+      </div>
+      <div class="form-group" id="s-ot-days-group" style="display:none;"><label>1:1 수업 요일</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="ot-day-check" value="월"> 월</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="ot-day-check" value="화"> 화</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="ot-day-check" value="수"> 수</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="ot-day-check" value="목"> 목</label>
+          <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="ot-day-check" value="금"> 금</label>
+        </div>
+        <input type="hidden" id="s-ot-days">
       </div>
     </div>
     <div class="section-label">특이사항</div>
@@ -675,6 +746,100 @@ tr.inactive td{opacity:.38;}
     <div id="memo-modal-body" style="font-size:14px;line-height:1.8;color:var(--text2);white-space:pre-wrap;"></div>
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="closeModal('modal-memo')">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 교재 마스터 모달 -->
+<div class="modal-overlay" id="modal-tbmaster">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-tbmaster-title">교재 등록</div>
+      <button class="modal-close" onclick="closeModal('modal-tbmaster')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group full"><label>교재명 *</label><input type="text" id="tbm-name" placeholder="예: Phonics Monster 3 SB+WB"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>브랜드</label>
+          <select id="tbm-brand">
+            <option value="공통">공통</option>
+            <option value="altiora">알티오라</option>
+            <option value="pangram">팬그램</option>
+            <option value="petamus">페타무스</option>
+          </select>
+        </div>
+        <div class="form-group"><label>출판사/시리즈</label><input type="text" id="tbm-publisher" placeholder="예: 이퓨처"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>구매가 (원)</label><input type="number" id="tbm-cost" value="0" min="0" step="500"></div>
+        <div class="form-group"><label>판매가 (원)</label><input type="number" id="tbm-sell" value="0" min="0" step="500" ></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group full"><label>메모</label><input type="text" id="tbm-memo" placeholder=""></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tbmaster')">취소</button>
+      <button class="btn btn-primary" id="modal-tbmaster-save">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 교재 반별 배정 모달 -->
+<div class="modal-overlay" id="modal-tb-assign">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">교재 마스터에서 배정</div>
+      <button class="modal-close" onclick="closeModal('modal-tb-assign')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>브랜드</label>
+          <select id="tba-brand" onchange="updateTbaClass()">
+            <option value="altiora">알티오라</option>
+            <option value="pangram">팬그램</option>
+            <option value="petamus">페타무스</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>반</label>
+          <select id="tba-cls"></select>
+        </div>
+        <div class="form-group">
+          <label>분기</label>
+          <select id="tba-quarter">
+            <option value="q1">1분기 (3~5월)</option>
+            <option value="q2">2분기 (6~8월)</option>
+            <option value="q3">3분기 (9~11월)</option>
+            <option value="q4">4분기 (12~2월)</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:600;">사용 교재 선택</div>
+          <div style="position:relative;flex:1;">
+            <input type="text" id="tba-search" placeholder="교재명 검색..." 
+              oninput="renderTbaBookList();document.getElementById('tba-search-clear').style.display=this.value?'flex':'none';"
+              style="width:100%;padding:6px 26px 6px 28px;font-size:12px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;">
+            <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text3);">🔍</span>
+            <span id="tba-search-clear" onclick="document.getElementById('tba-search').value='';renderTbaBookList();this.style.display='none';"
+              style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;align-items:center;">✕</span>
+          </div>
+        </div>
+        <div id="tba-book-list" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;">선택 합계: <span id="tba-total" style="font-weight:700;color:var(--accent);">0원</span></div>
+        <button class="btn btn-secondary btn-sm" onclick="document.querySelectorAll('.tba-check').forEach(c=>c.checked=false);calcTbaTotal();">전체 해제</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tb-assign')">취소</button>
+      <button class="btn btn-primary" onclick="applyTbAssign()">이 금액으로 반영</button>
     </div>
   </div>
 </div>
@@ -898,7 +1063,7 @@ function showLoadingOverlay(msg='로딩 중...'){
 }
 function hideLoadingOverlay(){
   const el=document.getElementById('loading-overlay');
-  if(el) el.style.display='none';
+  if(el){ el.style.display='none'; el.style.pointerEvents='none'; }
 }
 function saveYearData(){
   // localStorage 병행 저장 (오프라인 대비)
@@ -916,11 +1081,14 @@ async function loadYearDataFromFB(y){
         else if(s.htime==='1620') s.htime='alt_t_1620';
         // Firebase에서 빈 문자열 필드 누락 복원
         if(s.siblingId===undefined) s.siblingId='';
+        if(s.shuttleHalf===undefined) s.shuttleHalf=false;
         if(s.otDays===undefined) s.otDays='';
         if(s.careOverride===undefined) s.careOverride='';
         if(s.memo===undefined) s.memo='';
         if(s.leaveMonth===undefined) s.leaveMonth='';
       });
+      // tbMaster 초기화
+      if(!data.tbMaster) data.tbMaster=[];
       return data;
     }
   } catch(e){ console.warn('Firebase 로드 실패, localStorage 사용:', e); }
@@ -997,9 +1165,10 @@ function getTextbookPkg(s,month){
 
 function getShuttle(s,month){
   if(!isQM(month)||s.shuttle==='개별') return 0;
-  const half = s.shuttle==='등원편도'||s.shuttle==='하원편도';
   const amt = findFeeAmt(s.brand,'shuttle',s);
-  return half ? Math.round(amt/2) : amt;
+  // 편도 + 운영사정(shuttleHalf) 체크된 경우만 50%
+  const isHalf = (s.shuttle==='등원편도'||s.shuttle==='하원편도') && s.shuttleHalf;
+  return isHalf ? Math.round(amt/2) : amt;
 }
 
 function getExtTextbook(s,month){
@@ -1028,7 +1197,8 @@ function getCare(s){
 
 function calcBilling(s,month){
   let tuition=getTuition(s);
-  const sibling=s.sibling?Math.round(tuition*.05):0;
+  // 차감(deduct) 설정이 있는 경우 형제할인 미적용
+  const sibling = s.sibling ? Math.round(tuition*.05) : 0;
   tuition-=sibling;
   const shuttle=getShuttle(s,month);
   const textbook_pkg=getTextbookPkg(s,month);
@@ -1063,6 +1233,46 @@ function calcBilling(s,month){
 // ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
+// ── 계산기 ──
+let calcCurrent='0', calcPrev='', calcOperator='', calcNewNum=true;
+function calcUpdateDisplay(){
+  document.getElementById('calc-val').textContent = parseFloat(calcCurrent).toLocaleString('ko-KR');
+  document.getElementById('calc-expr').textContent = calcPrev && calcOperator ? calcPrev+' '+calcOperator : '';
+}
+function calcNum(n){
+  if(calcNewNum){ calcCurrent=n; calcNewNum=false; }
+  else calcCurrent = calcCurrent==='0'?n:calcCurrent+n;
+  calcUpdateDisplay();
+}
+function calcDot(){
+  if(calcNewNum){ calcCurrent='0.'; calcNewNum=false; }
+  else if(!calcCurrent.includes('.')) calcCurrent+='.';
+  calcUpdateDisplay();
+}
+function calcOp(op){
+  if(calcOperator && !calcNewNum) calcEqual();
+  calcPrev = calcCurrent;
+  calcOperator = op;
+  calcNewNum = true;
+  calcUpdateDisplay();
+}
+function calcEqual(){
+  if(!calcOperator||!calcPrev) return;
+  const a=parseFloat(calcPrev), b=parseFloat(calcCurrent);
+  let r=0;
+  if(calcOperator==='+') r=a+b;
+  else if(calcOperator==='-') r=a-b;
+  else if(calcOperator==='×') r=a*b;
+  else if(calcOperator==='÷') r=b?a/b:0;
+  calcCurrent = String(parseFloat(r.toFixed(10)));
+  calcOperator=''; calcPrev=''; calcNewNum=true;
+  calcUpdateDisplay();
+}
+function calcClear(){ calcCurrent='0'; calcPrev=''; calcOperator=''; calcNewNum=true; calcUpdateDisplay(); }
+function calcSign(){ calcCurrent=String(-parseFloat(calcCurrent)); calcUpdateDisplay(); }
+function calcPercent(){ calcCurrent=String(parseFloat(calcCurrent)/100); calcUpdateDisplay(); }
+// ── /계산기 ──
+
 async function init(){
   const now=new Date();
   document.getElementById('topbar-date').textContent=`${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일`;
@@ -1085,6 +1295,7 @@ async function init(){
 
   if(!CY.students||!CY.students.length){CY.students=[];loadSample();}
   if(!CY.textbooks||!CY.textbooks.length){CY.textbooks=[];loadSampleTB();}
+  if(!CY.tbMaster||!CY.tbMaster.length){CY.tbMaster=[];loadSampleTbMaster();}
   updateClassOptions();updateTbClass();updateStudentClassFilter();
   renderDashboard();renderStudentTable();renderTextbookTable();renderMasterContent('tuition');renderSpecialList('all');renderArchiveList();
   // 마지막 생성 청구서 복원
@@ -1099,6 +1310,10 @@ function loadSample(){
   CY.students=[{"id": "s001", "brand": "altiora", "cls": "4 Mare", "name": "김나현", "ename": "Alina", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "번호매번변경", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s002", "brand": "altiora", "cls": "4 Mare", "name": "김해윤", "ename": "Hailey", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s003", "brand": "altiora", "cls": "4 Mare", "name": "김해준", "ename": "Hayden", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s004", "brand": "altiora", "cls": "4 Mare", "name": "박시언", "ename": "Leo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s005", "brand": "altiora", "cls": "4 Mare", "name": "이채원", "ename": "Shany", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s006", "brand": "altiora", "cls": "4 Mare", "name": "정이안", "ename": "Yian", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "개별하원", "active": true}, {"id": "s007", "brand": "altiora", "cls": "4 Mare", "name": "최지오", "ename": "Jio", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "6/1 첫 등원", "active": true}, {"id": "s008", "brand": "altiora", "cls": "5 Aqua", "name": "권루나", "ename": "Luna", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "~6/5 퇴원", "active": true}, {"id": "s009", "brand": "altiora", "cls": "5 Aqua", "name": "김유찬", "ename": "Aaron", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "3:10하원 개별 3/12~", "active": true}, {"id": "s010", "brand": "altiora", "cls": "5 Aqua", "name": "김이안", "ename": "Ian", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s011", "brand": "altiora", "cls": "5 Aqua", "name": "남하늘", "ename": "Sky", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s012", "brand": "altiora", "cls": "5 Aqua", "name": "문태연", "ename": "Chloe", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "미발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s013", "brand": "altiora", "cls": "5 Aqua", "name": "박도언", "ename": "Milo", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s014", "brand": "altiora", "cls": "5 Aqua", "name": "박진혁", "ename": "Jin", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "수요일3:10하원", "active": true, "customTuition": 1415000}, {"id": "s015", "brand": "altiora", "cls": "5 Aqua", "name": "이도영", "ename": "Andy", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s016", "brand": "altiora", "cls": "5 Aqua", "name": "이로하", "ename": "Noah", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s017", "brand": "altiora", "cls": "5 Aqua", "name": "이수혁", "ename": "Harry", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "개별하원", "active": true}, {"id": "s018", "brand": "altiora", "cls": "5 Aqua", "name": "정연호", "ename": "Aiden", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "미발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s019", "brand": "altiora", "cls": "5 Aqua", "name": "조유강", "ename": "Steve", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "3:10하원 3/12~", "active": true}, {"id": "s020", "brand": "altiora", "cls": "5 Aqua", "name": "변민서", "ename": "Ena", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "6/8 첫 등원", "active": true}, {"id": "s021", "brand": "altiora", "cls": "6-1 Viento", "name": "박서빈", "ename": "Chloe", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s022", "brand": "altiora", "cls": "6-1 Viento", "name": "박서하", "ename": "Seoha", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s023", "brand": "altiora", "cls": "6-1 Viento", "name": "이수호", "ename": "Suho", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s024", "brand": "altiora", "cls": "6-1 Viento", "name": "정수호", "ename": "Suho", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 1, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "개별하원 ~7/16", "active": true, "otDays": "월", "otPayType": "분기"}, {"id": "s025", "brand": "altiora", "cls": "6-2 Arbor", "name": "김유하", "ename": "Yuha", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": true, "memo": "", "active": true}, {"id": "s026", "brand": "altiora", "cls": "6-2 Arbor", "name": "박시후", "ename": "Sihoo", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "주3회", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "월교습비:부/기타:모", "active": true, "careDays": ["목"], "otDays": "목"}, {"id": "s027", "brand": "altiora", "cls": "6-2 Arbor", "name": "박이서", "ename": "Yiseo", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "otDays": "금"}, {"id": "s028", "brand": "altiora", "cls": "6-2 Arbor", "name": "신예원", "ename": "Ellie", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "~7/8 분당이사", "active": true}, {"id": "s029", "brand": "altiora", "cls": "6-2 Arbor", "name": "신주환", "ename": "Juhwan", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s030", "brand": "altiora", "cls": "6-2 Arbor", "name": "오아윤", "ename": "Ellia", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s031", "brand": "altiora", "cls": "6-2 Arbor", "name": "이은우", "ename": "Lia", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s032", "brand": "altiora", "cls": "6-2 Arbor", "name": "이태온", "ename": "Ben", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s033", "brand": "altiora", "cls": "6-2 Arbor", "name": "이하린", "ename": "Harin", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "아버지", "split": false, "memo": "", "active": true}, {"id": "s034", "brand": "altiora", "cls": "6-2 Arbor", "name": "전서후", "ename": "Shawn", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s035", "brand": "altiora", "cls": "6-2 Arbor", "name": "최율", "ename": "William", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s036", "brand": "altiora", "cls": "6-2 Flos", "name": "김도아", "ename": "Doa", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "주3회", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "careDays": ["화", "목"], "otDays": "화,목"}, {"id": "s037", "brand": "altiora", "cls": "6-2 Flos", "name": "김태리", "ename": "Taeri", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s038", "brand": "altiora", "cls": "6-2 Flos", "name": "유서온", "ename": "Owen", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s039", "brand": "altiora", "cls": "6-2 Flos", "name": "이라엘", "ename": "Anna", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "조부모", "split": false, "memo": "", "active": true}, {"id": "s040", "brand": "altiora", "cls": "6-2 Flos", "name": "이정민", "ename": "Lucas", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "3:10하원", "active": true}, {"id": "s041", "brand": "altiora", "cls": "6-2 Flos", "name": "이희아", "ename": "Olivia", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "현금만미발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s042", "brand": "altiora", "cls": "6-2 Flos", "name": "전설", "ename": "Jeremiah", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "SIS 6/12~8/10", "active": true}, {"id": "s043", "brand": "altiora", "cls": "6-2 Flos", "name": "조우식", "ename": "Joshua", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "otDays": "월"}, {"id": "s044", "brand": "altiora", "cls": "6-2 Flos", "name": "최이서", "ename": "Iseo", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "8월초 예정", "active": true}, {"id": "s045", "brand": "altiora", "cls": "6-2 Flos", "name": "황도겸", "ename": "Aiden", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 1, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "otDays": "금", "otPayType": "월납"}, {"id": "s046", "brand": "altiora", "cls": "6-2 Flos", "name": "Philip Miller", "ename": "Philip", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "개별하원 ~7/24", "active": true}, {"id": "s047", "brand": "altiora", "cls": "7-2 Cambridge", "name": "강민주", "ename": "Rachel", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s048", "brand": "altiora", "cls": "7-2 Cambridge", "name": "김민서", "ename": "Irene", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "otDays": "목"}, {"id": "s049", "brand": "altiora", "cls": "7-2 Cambridge", "name": "민세진엘리즈", "ename": "Elise", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "otDays": "화"}, {"id": "s050", "brand": "altiora", "cls": "7-2 Cambridge", "name": "서채이", "ename": "Bella", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s051", "brand": "altiora", "cls": "7-2 Cambridge", "name": "안지수", "ename": "Jisoo", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "4/29~", "active": true}, {"id": "s052", "brand": "altiora", "cls": "7-2 Cambridge", "name": "임수호", "ename": "Felix", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "주3회", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "월목돌봄", "active": true, "careDays": ["월", "목"]}, {"id": "s053", "brand": "altiora", "cls": "7-2 Cambridge", "name": "정휘찬", "ename": "Leo", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "1회", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "월금돌봄 개별하원", "active": true, "careDays": ["월"]}, {"id": "s054", "brand": "altiora", "cls": "7-2 Cambridge", "name": "채예린", "ename": "Rina", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s055", "brand": "altiora", "cls": "7-2 Harvard", "name": "김동욱", "ename": "Danny", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "주3회", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "아버지", "split": true, "memo": "화수목돌봄 분할결제", "active": true, "careDays": ["월", "화", "수"]}, {"id": "s056", "brand": "altiora", "cls": "7-2 Harvard", "name": "김아랑", "ename": "Ella", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "주3회", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "careDays": ["화", "목"], "otDays": "화"}, {"id": "s057", "brand": "altiora", "cls": "7-2 Harvard", "name": "김유하", "ename": "Michelle", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": true, "memo": "4/2~ 매월분할결제", "active": true, "otDays": "수"}, {"id": "s058", "brand": "altiora", "cls": "7-2 Harvard", "name": "도아라", "ename": "Ara", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "SIE 8/18입학", "active": true}, {"id": "s059", "brand": "altiora", "cls": "7-2 Harvard", "name": "양시은", "ename": "Sieun", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "아버지", "split": false, "memo": "", "active": true}, {"id": "s060", "brand": "altiora", "cls": "7-2 Harvard", "name": "이윤아", "ename": "Chloe", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s061", "brand": "altiora", "cls": "7-2 Harvard", "name": "이지은", "ename": "Emma", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s062", "brand": "altiora", "cls": "7-2 Harvard", "name": "최준우", "ename": "Leo", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "개별하원", "active": true}, {"id": "s063", "brand": "altiora", "cls": "7-3 Oxford", "name": "김유이", "ename": "Yui", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s064", "brand": "altiora", "cls": "7-3 Oxford", "name": "김재이", "ename": "Jay", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s065", "brand": "altiora", "cls": "7-3 Oxford", "name": "손유준", "ename": "Yujoon", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "개별하원", "active": true}, {"id": "s066", "brand": "altiora", "cls": "7-3 Oxford", "name": "윤도준", "ename": "Dojun", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "5/6 이사", "active": true}, {"id": "s067", "brand": "altiora", "cls": "7-3 Oxford", "name": "이강민", "ename": "Leo", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s068", "brand": "altiora", "cls": "7-3 Oxford", "name": "이리안", "ename": "Rian", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s069", "brand": "altiora", "cls": "7-3 Oxford", "name": "임서연", "ename": "Seoyeon", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "otDays": "화"}, {"id": "s070", "brand": "altiora", "cls": "7-3 Oxford", "name": "정윤찬", "ename": "Eric J", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s071", "brand": "altiora", "cls": "7-3 Oxford", "name": "최세하", "ename": "Ella", "gender": "여", "htime": "alt_t_1620", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s072", "brand": "altiora", "cls": "7-3 Oxford", "name": "호준오", "ename": "Chris", "gender": "남", "htime": "alt_t_1620", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "개별등원 셔틀100%납부", "active": true}, {"id": "s073", "brand": "pangram", "cls": "PK6A 월수금", "name": "이로이", "ename": "Roy", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s074", "brand": "pangram", "cls": "PK6A 월수금", "name": "이승윤", "ename": "Valentino", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "등원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "차량불가", "active": true}, {"id": "s075", "brand": "pangram", "cls": "PK6A 월수금", "name": "전승재", "ename": "Seungjae", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "05/06~", "active": true}, {"id": "s076", "brand": "pangram", "cls": "PK6A 월수금", "name": "장서호", "ename": "Damian", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "등원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "오즈마법사등원불가 하원만", "active": true}, {"id": "s077", "brand": "pangram", "cls": "PK6B 화목", "name": "김도겸", "ename": "Kai", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s078", "brand": "pangram", "cls": "PK6B 화목", "name": "박하연", "ename": "Lily", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s079", "brand": "pangram", "cls": "PK6B 화목", "name": "신아진", "ename": "Zoey", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s080", "brand": "pangram", "cls": "PK6B 화목", "name": "이라온", "ename": "Raon", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s081", "brand": "pangram", "cls": "PK6B 화목", "name": "임아연", "ename": "Angelina", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s082", "brand": "pangram", "cls": "PK6B 화목", "name": "장시현", "ename": "Sean", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s083", "brand": "pangram", "cls": "PK6B 화목", "name": "진이서", "ename": "Iso", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s084", "brand": "pangram", "cls": "PK6B 화목", "name": "최준우", "ename": "Junu", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "등원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "1:1 수요일", "active": true, "otDays": "수"}, {"id": "s085", "brand": "pangram", "cls": "PK6D 화목", "name": "김건우", "ename": "Milo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s086", "brand": "pangram", "cls": "PK6D 화목", "name": "김다인", "ename": "Jennie", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s087", "brand": "pangram", "cls": "PK6D 화목", "name": "박서아", "ename": "Ruby", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "하원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "편도50%", "active": true}, {"id": "s088", "brand": "pangram", "cls": "PK6D 화목", "name": "신다온", "ename": "Daon", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s089", "brand": "pangram", "cls": "PK6D 화목", "name": "유시현", "ename": "Roy", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s090", "brand": "pangram", "cls": "PK6D 화목", "name": "유지은", "ename": "Jieun", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s091", "brand": "pangram", "cls": "PK6D 화목", "name": "윤유하", "ename": "Yuha", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s092", "brand": "pangram", "cls": "PK6D 화목", "name": "임시우", "ename": "Leo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s093", "brand": "pangram", "cls": "PK6H 화목", "name": "강다현", "ename": "Dahlia", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s094", "brand": "pangram", "cls": "PK6H 화목", "name": "김태린", "ename": "Tania", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s095", "brand": "pangram", "cls": "PK6H 화목", "name": "유시우", "ename": "Leo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s096", "brand": "pangram", "cls": "PK6H 화목", "name": "이새봄", "ename": "Vicky", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s097", "brand": "pangram", "cls": "PK6H 화목", "name": "이여울", "ename": "Elin", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "4/7~", "active": true}, {"id": "s098", "brand": "pangram", "cls": "PK6H 화목", "name": "이지한", "ename": "Ryan", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s099", "brand": "pangram", "cls": "PK6H 화목", "name": "정세아", "ename": "Celia", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s100", "brand": "pangram", "cls": "PK6H 화목", "name": "최지민", "ename": "Sophia", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s101", "brand": "pangram", "cls": "PK7A 월수금", "name": "김도현", "ename": "Logan", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "7월말이사", "active": true}, {"id": "s102", "brand": "pangram", "cls": "PK7A 월수금", "name": "김이준", "ename": "Jun", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s103", "brand": "pangram", "cls": "PK7A 월수금", "name": "박승재", "ename": "Jason", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s104", "brand": "pangram", "cls": "PK7A 월수금", "name": "송이준", "ename": "E-Joon", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s105", "brand": "pangram", "cls": "PK7A 월수금", "name": "이시헌", "ename": "Henry", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s106", "brand": "pangram", "cls": "PK7A 월수금", "name": "정재윤", "ename": "Jaeyun", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s107", "brand": "pangram", "cls": "PK7B 화목", "name": "구도윤", "ename": "Leo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s108", "brand": "pangram", "cls": "PK7B 화목", "name": "김서은", "ename": "Noella", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s109", "brand": "pangram", "cls": "PK7B 화목", "name": "김주현", "ename": "Leo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "하원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "셔틀50% 등원불가", "active": true}, {"id": "s110", "brand": "pangram", "cls": "PK7B 화목", "name": "류가흔", "ename": "Freya", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s111", "brand": "pangram", "cls": "PK7B 화목", "name": "민하늘", "ename": "Sky", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "5/6 상담", "active": true}, {"id": "s112", "brand": "pangram", "cls": "PK7B 화목", "name": "오하온", "ename": "Haon", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s113", "brand": "pangram", "cls": "PK7B 화목", "name": "임서하", "ename": "Summer", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s114", "brand": "pangram", "cls": "PK7B 화목", "name": "추하은", "ename": "Hailie", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s115", "brand": "pangram", "cls": "PK7C 월수금", "name": "유시연", "ename": "Sean", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s116", "brand": "pangram", "cls": "PK7C 월수금", "name": "윤재이", "ename": "Jay", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s117", "brand": "pangram", "cls": "PK7C 월수금", "name": "이예서", "ename": "Yeseo", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "화목이동 대신 월수만", "active": true}, {"id": "s118", "brand": "pangram", "cls": "PK7C 월수금", "name": "이하린", "ename": "Aurora", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "아버지", "split": false, "memo": "", "active": true}, {"id": "s119", "brand": "pangram", "cls": "PK7C 월수금", "name": "최서안", "ename": "Roy", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s120", "brand": "pangram", "cls": "PK7C 월수금", "name": "최유하", "ename": "Yuha", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "하원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "셔틀100%납부 하원만탑승", "active": true}, {"id": "s121", "brand": "pangram", "cls": "PK7C 월수금", "name": "황리아", "ename": "Lia", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s122", "brand": "pangram", "cls": "PK7D 화목", "name": "구연서", "ename": "Stella", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s123", "brand": "pangram", "cls": "PK7D 화목", "name": "김이수", "ename": "Isu", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s124", "brand": "pangram", "cls": "PK7D 화목", "name": "남유준", "ename": "Jay", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s125", "brand": "pangram", "cls": "PK7D 화목", "name": "신나율", "ename": "Nayul", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s126", "brand": "pangram", "cls": "PK7D 화목", "name": "이다온", "ename": "Daon", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s127", "brand": "pangram", "cls": "PK7D 화목", "name": "이나연", "ename": "Nyla", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "5/12~", "active": true}, {"id": "s128", "brand": "pangram", "cls": "PK7D 화목", "name": "조아인", "ename": "Brad", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s129", "brand": "pangram", "cls": "PK7H 화목", "name": "김단우", "ename": "Danu", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "4/7~", "active": true}, {"id": "s130", "brand": "pangram", "cls": "PK7H 화목", "name": "김리한", "ename": "Ryan", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s131", "brand": "pangram", "cls": "PK7H 화목", "name": "김지윤", "ename": "Julia", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s132", "brand": "pangram", "cls": "PK7H 화목", "name": "백소윤", "ename": "Stella", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "6/2 퇴원", "active": true}, {"id": "s133", "brand": "pangram", "cls": "PK7H 화목", "name": "성하담", "ename": "Hadam", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s134", "brand": "pangram", "cls": "PK7H 화목", "name": "이윤아", "ename": "Luna", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "1회", "careOverride": "", "onetone": 160000, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true, "careDays": ["금"], "otDays": "금"}, {"id": "s135", "brand": "pangram", "cls": "PK7H 화목", "name": "이나연", "ename": "Nyla", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "5/12~", "active": true}, {"id": "s136", "brand": "pangram", "cls": "PK7H 화목", "name": "김단우", "ename": "Danu", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "4/7 화~", "active": true}, {"id": "s137", "brand": "pangram", "cls": "Tier 1C 월수금", "name": "강유이", "ename": "Yui", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s138", "brand": "pangram", "cls": "Tier 1C 월수금", "name": "조아윤", "ename": "Cindy", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s139", "brand": "pangram", "cls": "Tier 1C 월수금", "name": "최이안", "ename": "Ian", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s140", "brand": "pangram", "cls": "Tier 1C 월수금", "name": "황유준", "ename": "Alex", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s141", "brand": "pangram", "cls": "Tier 1C 월수금", "name": "임선우", "ename": "Seonwoo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s142", "brand": "pangram", "cls": "Tier 3C 월수금", "name": "김주찬", "ename": "Ian", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "등원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s143", "brand": "pangram", "cls": "Tier 3C 월수금", "name": "배채원", "ename": "Alice", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "등원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s144", "brand": "pangram", "cls": "Tier 3C 월수금", "name": "윤진우", "ename": "Roy", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s145", "brand": "pangram", "cls": "Tier 3C 월수금", "name": "임준우", "ename": "Junwoo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s146", "brand": "pangram", "cls": "Tier 3C 월수금", "name": "조해준", "ename": "Juny", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s147", "brand": "pangram", "cls": "Tier 3C 월수금", "name": "안주원", "ename": "Juwon", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "5/6~5/15 퇴원", "active": true}, {"id": "s148", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "도지완", "ename": "Jaden", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s149", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "이로아", "ename": "Roa", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s150", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "이로운", "ename": "Roney", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s151", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "이채이", "ename": "Amy", "gender": "여", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s152", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "임채이", "ename": "Chae Yi", "gender": "여", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "미발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s153", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "장승민", "ename": "Seungmin", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s154", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "전새나", "ename": "Saenna", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s155", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "전새이", "ename": "Saeii", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s156", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "정시아", "ename": "Sia", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s157", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "채윤재", "ename": "Justin", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "등원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "등원셔틀만", "active": true}, {"id": "s158", "brand": "petamus", "cls": "Phoenix Lv.1", "name": "조윤우", "ename": "Yunu", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "7/3~", "active": true}, {"id": "s159", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "길선호", "ename": "Timothy", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s160", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "길주호", "ename": "Daniel", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s161", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "김리원", "ename": "Riwon", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s162", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "김범진", "ename": "Beom jin", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s163", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "윤지아", "ename": "Jia", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "주5회→주3회변경", "active": true}, {"id": "s164", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "이웅찬", "ename": "Eric", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "현금만미발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s165", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "이재아", "ename": "Jae-a", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s166", "brand": "petamus", "cls": "Pegasus Lv.2", "name": "한윤서", "ename": "Lucy", "gender": "여", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s167", "brand": "petamus", "cls": "Griffin Lv.3", "name": "김나희", "ename": "Nahee", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "4월~주3회변경", "active": true}, {"id": "s168", "brand": "petamus", "cls": "Griffin Lv.3", "name": "김서준", "ename": "Jayden", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s169", "brand": "petamus", "cls": "Griffin Lv.3", "name": "김예나", "ename": "Bella", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "5/6~", "active": true}, {"id": "s170", "brand": "petamus", "cls": "Griffin Lv.3", "name": "김이현", "ename": "Teo", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "등원편도", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "하원셔틀만", "active": true}, {"id": "s171", "brand": "petamus", "cls": "Griffin Lv.3", "name": "박세인", "ename": "Sein", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s172", "brand": "petamus", "cls": "Griffin Lv.3", "name": "연제우", "ename": "Jay", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "등원편도", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "등원셔틀만", "active": true}, {"id": "s173", "brand": "petamus", "cls": "Griffin Lv.3", "name": "이로운", "ename": "Rowoon", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s174", "brand": "petamus", "cls": "Griffin Lv.3", "name": "최윤하", "ename": "Jenny", "gender": "여", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "초2", "active": true}, {"id": "s175", "brand": "petamus", "cls": "Griffin Lv.3", "name": "최하은", "ename": "Jenny", "gender": "여", "htime": "alt_t_1510", "freq": "5", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "기타", "split": false, "memo": "", "active": true}, {"id": "s176", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "박지온", "ename": "Zion", "gender": "남", "htime": "alt_t_1510", "freq": "5", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s177", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "온지민", "ename": "Jimin", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "개별", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "6월교습비선납완료", "active": true}, {"id": "s178", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "이주하", "ename": "Jenny", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s179", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "이한의", "ename": "Rex", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s180", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "정미주", "ename": "Mijoo", "gender": "여", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "미발급", "sms": "기타", "split": false, "memo": "카톡으로SMS송부", "active": true}, {"id": "s181", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "조강준", "ename": "Jack", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s182", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "조민준", "ename": "Juny", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": true, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s183", "brand": "petamus", "cls": "Unicorn Lv.4", "name": "조수빈", "ename": "Ben", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "", "active": true}, {"id": "s184", "brand": "petamus", "cls": "Kelpie", "name": "채세주", "ename": "Peter", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "둘다", "split": false, "memo": "", "active": true}, {"id": "s185", "brand": "petamus", "cls": "Kelpie", "name": "황윤재", "ename": "Andy", "gender": "남", "htime": "alt_t_1510", "freq": "3", "shuttle": "왕복", "paytype": "월납", "sibling": false, "care": "없음", "careOverride": "", "onetone": 0, "receipt": "항상발급", "sms": "어머니", "split": false, "memo": "이사장님아들 수납없음", "active": true}];
   saveYearData();
 }
+function loadSampleTbMaster(){
+  CY.tbMaster = [{"id": "tbm_alt_001", "name": "Little Hands Nursery", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 13000, "memo": ""}, {"id": "tbm_alt_002", "name": "New Big Fun 1 SB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 30000, "memo": ""}, {"id": "tbm_alt_003", "name": "Little Hands ABC Book", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 17000, "memo": ""}, {"id": "tbm_alt_004", "name": "Toy Team 1 SB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 20000, "memo": ""}, {"id": "tbm_alt_005", "name": "New Big Fun 2 SB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 30000, "memo": ""}, {"id": "tbm_alt_006", "name": "Toy Team 2 SB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 20000, "memo": ""}, {"id": "tbm_alt_007", "name": "Altiora Alphabet worksheets", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 5000, "memo": ""}, {"id": "tbm_alt_008", "name": "Little Hands 1 SB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 21000, "memo": ""}, {"id": "tbm_alt_009", "name": "Phonics Monster 1 SB+WB", "brand": "altiora", "publisher": "이퓨처", "costPrice": 0, "sellPrice": 22000, "memo": ""}, {"id": "tbm_alt_010", "name": "Phonics Monster 2 SB+WB", "brand": "altiora", "publisher": "이퓨처", "costPrice": 0, "sellPrice": 22000, "memo": ""}, {"id": "tbm_alt_011", "name": "Altiora Sight Words HW WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 5000, "memo": ""}, {"id": "tbm_alt_012", "name": "Phonics Monster 3 SB+WB", "brand": "altiora", "publisher": "이퓨처", "costPrice": 0, "sellPrice": 22000, "memo": ""}, {"id": "tbm_alt_013", "name": "Easy Link Starter L1 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16000, "memo": ""}, {"id": "tbm_alt_014", "name": "Easy Link L1 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16000, "memo": ""}, {"id": "tbm_alt_015", "name": "into start right reader G1.2", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 27000, "memo": ""}, {"id": "tbm_alt_016", "name": "Phonics Monster 4 SB+WB", "brand": "altiora", "publisher": "이퓨처", "costPrice": 0, "sellPrice": 22000, "memo": ""}, {"id": "tbm_alt_017", "name": "Easy Link L2 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16000, "memo": ""}, {"id": "tbm_alt_018", "name": "Wonderful world basic 1 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16500, "memo": ""}, {"id": "tbm_alt_019", "name": "Multiple reading skills Prep 1", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 17500, "memo": ""}, {"id": "tbm_alt_020", "name": "Wonderful world basic 2 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16500, "memo": ""}, {"id": "tbm_alt_021", "name": "Grammar Gate Starter 1 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 15000, "memo": ""}, {"id": "tbm_alt_022", "name": "Multiple reading skills Prep 2", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 17500, "memo": ""}, {"id": "tbm_alt_023", "name": "Grammar Gate Starter 2 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 15000, "memo": ""}, {"id": "tbm_alt_024", "name": "Multiple reading skills A", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 17500, "memo": ""}, {"id": "tbm_alt_025", "name": "Wonderful world basic 4 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16500, "memo": ""}, {"id": "tbm_alt_026", "name": "Wonderful world basic 3 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16500, "memo": ""}, {"id": "tbm_alt_027", "name": "Bricks first grammar 1 SB+WB", "brand": "altiora", "publisher": "브릭스", "costPrice": 0, "sellPrice": 22000, "memo": ""}, {"id": "tbm_alt_028", "name": "Bricks first grammar 2 SB+WB", "brand": "altiora", "publisher": "브릭스", "costPrice": 0, "sellPrice": 22000, "memo": ""}, {"id": "tbm_alt_029", "name": "Wonderful world basic 6 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 16500, "memo": ""}, {"id": "tbm_alt_030", "name": "Write Right Beginner 3 SB+WB", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 14000, "memo": ""}, {"id": "tbm_alt_031", "name": "Multiple reading skills B", "brand": "altiora", "publisher": "", "costPrice": 0, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pt_001", "name": "English Language Arts K", "brand": "petamus", "publisher": "", "costPrice": 42000, "sellPrice": 42000, "memo": ""}, {"id": "tbm_pt_002", "name": "English Language Arts Lv. 1", "brand": "petamus", "publisher": "", "costPrice": 42000, "sellPrice": 42000, "memo": ""}, {"id": "tbm_pt_003", "name": "Progress English Language Arts Lv. 1", "brand": "petamus", "publisher": "", "costPrice": 42000, "sellPrice": 42000, "memo": ""}, {"id": "tbm_pt_004", "name": "Progress English Language Arts Lv. 2", "brand": "petamus", "publisher": "", "costPrice": 42000, "sellPrice": 42000, "memo": ""}, {"id": "tbm_pt_005", "name": "Progress English Language Arts Lv. 3", "brand": "petamus", "publisher": "", "costPrice": 42000, "sellPrice": 42000, "memo": ""}, {"id": "tbm_pt_006", "name": "ConnecTree Vol. 1", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_007", "name": "ConnecTree Vol. 2", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_008", "name": "ConnecTree Vol. 3", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_009", "name": "ConnecTree Vol. 4", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_010", "name": "FluentTree Vol. 7", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_011", "name": "FluentTree Vol. 8", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_012", "name": "FluentTree Vol. 9", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_013", "name": "FluentTree Vol. 10", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_014", "name": "FluentTree Vol. 11", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_015", "name": "FluentTree Vol. 12", "brand": "petamus", "publisher": "", "costPrice": 20700, "sellPrice": 27945, "memo": ""}, {"id": "tbm_pt_016", "name": "FluentTree Vol. 1", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_017", "name": "FluentTree Vol. 2", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_018", "name": "FluentTree Vol. 3", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_019", "name": "FluentTree Vol. 4", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_020", "name": "ConnecTree WB", "brand": "petamus", "publisher": "", "costPrice": 0, "sellPrice": 5000, "memo": ""}, {"id": "tbm_pt_021", "name": "FluentTree WB", "brand": "petamus", "publisher": "", "costPrice": 0, "sellPrice": 5000, "memo": ""}, {"id": "tbm_pt_022", "name": "PYP Basic 1", "brand": "petamus", "publisher": "", "costPrice": 14400, "sellPrice": 19440, "memo": ""}, {"id": "tbm_pt_023", "name": "PYP Basic 3", "brand": "petamus", "publisher": "", "costPrice": 14400, "sellPrice": 19440, "memo": ""}, {"id": "tbm_pt_024", "name": "PYP Basic 5", "brand": "petamus", "publisher": "", "costPrice": 14400, "sellPrice": 19440, "memo": ""}, {"id": "tbm_pt_025", "name": "PYP Basic 7", "brand": "petamus", "publisher": "", "costPrice": 14400, "sellPrice": 19440, "memo": ""}, {"id": "tbm_pt_026", "name": "PYP Basic 8", "brand": "petamus", "publisher": "", "costPrice": 14400, "sellPrice": 19440, "memo": ""}, {"id": "tbm_pt_027", "name": "PYP Basic 9", "brand": "petamus", "publisher": "", "costPrice": 14400, "sellPrice": 19440, "memo": ""}, {"id": "tbm_pt_028", "name": "PYP lv2 Vol. 1", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_029", "name": "PYP lv2 Vol. 2", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_030", "name": "PYP lv2 Vol. 3", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_031", "name": "PYP lv 3 Vol.2", "brand": "petamus", "publisher": "", "costPrice": 28800, "sellPrice": 38880, "memo": ""}, {"id": "tbm_pt_032", "name": "PYP1. vol 1", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_033", "name": "PYP1. vol 2", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_034", "name": "PYP1. vol 3", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_035", "name": "PYP1. vol 4", "brand": "petamus", "publisher": "", "costPrice": 22500, "sellPrice": 30375, "memo": ""}, {"id": "tbm_pt_036", "name": "Link L1", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 20250, "memo": ""}, {"id": "tbm_pt_037", "name": "Link L2", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 20250, "memo": ""}, {"id": "tbm_pt_038", "name": "Vocabulary Workshop Purple", "brand": "petamus", "publisher": "", "costPrice": 25000, "sellPrice": 25000, "memo": ""}, {"id": "tbm_pt_039", "name": "Vocabulary Workshop Green", "brand": "petamus", "publisher": "", "costPrice": 25000, "sellPrice": 25000, "memo": ""}, {"id": "tbm_pt_040", "name": "Vocabulary Workshop Orange", "brand": "petamus", "publisher": "", "costPrice": 25000, "sellPrice": 25000, "memo": ""}, {"id": "tbm_pt_041", "name": "1000 Basic English Words 1", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 15000, "memo": ""}, {"id": "tbm_pt_042", "name": "1000 Basic English Words 2", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 15000, "memo": ""}, {"id": "tbm_pt_043", "name": "1000 Basic English Words 3", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 15000, "memo": ""}, {"id": "tbm_pt_044", "name": "1000 Basic English Words 4", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 15000, "memo": ""}, {"id": "tbm_pt_045", "name": "1200 Key English Words 1", "brand": "petamus", "publisher": "", "costPrice": 14000, "sellPrice": 14000, "memo": ""}, {"id": "tbm_pt_046", "name": "1200 Key English Words 2", "brand": "petamus", "publisher": "", "costPrice": 14000, "sellPrice": 14000, "memo": ""}, {"id": "tbm_pt_047", "name": "1200 Key English Words 3", "brand": "petamus", "publisher": "", "costPrice": 14000, "sellPrice": 14000, "memo": ""}, {"id": "tbm_pt_048", "name": "SS101 Vol. 1", "brand": "petamus", "publisher": "", "costPrice": 16000, "sellPrice": 21600, "memo": ""}, {"id": "tbm_pt_049", "name": "SS101 Vol. 2", "brand": "petamus", "publisher": "", "costPrice": 16000, "sellPrice": 21600, "memo": ""}, {"id": "tbm_pt_050", "name": "SS101 Vol. 3", "brand": "petamus", "publisher": "", "costPrice": 16000, "sellPrice": 21600, "memo": ""}, {"id": "tbm_pt_051", "name": "Sentence Writing 1", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 15000, "memo": ""}, {"id": "tbm_pt_052", "name": "Sentence Writing 2", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 15000, "memo": ""}, {"id": "tbm_pt_053", "name": "Sentence Writing 3", "brand": "petamus", "publisher": "", "costPrice": 15000, "sellPrice": 15000, "memo": ""}, {"id": "tbm_pt_054", "name": "Wonderful World Basic Lv 1", "brand": "petamus", "publisher": "", "costPrice": 16500, "sellPrice": 16500, "memo": ""}, {"id": "tbm_pt_055", "name": "Wonderful World Basic Lv 2", "brand": "petamus", "publisher": "", "costPrice": 16500, "sellPrice": 16500, "memo": ""}, {"id": "tbm_pt_056", "name": "Wonderful World Basic Lv 3", "brand": "petamus", "publisher": "", "costPrice": 16500, "sellPrice": 16500, "memo": ""}, {"id": "tbm_pt_057", "name": "Wonderful World Basic Lv 4", "brand": "petamus", "publisher": "", "costPrice": 16500, "sellPrice": 16500, "memo": ""}, {"id": "tbm_pt_058", "name": "My Next Grammar 2", "brand": "petamus", "publisher": "", "costPrice": 23000, "sellPrice": 23000, "memo": ""}, {"id": "tbm_pt_059", "name": "My Next Grammar 3", "brand": "petamus", "publisher": "", "costPrice": 23000, "sellPrice": 23000, "memo": ""}, {"id": "tbm_pt_060", "name": "AR Book - Mercy Watson", "brand": "petamus", "publisher": "", "costPrice": 10700, "sellPrice": 10700, "memo": ""}, {"id": "tbm_pt_061", "name": "AR Book - Dory Fantasmagory", "brand": "petamus", "publisher": "", "costPrice": 10000, "sellPrice": 10000, "memo": ""}, {"id": "tbm_pt_062", "name": "AR Book - Stories of Robots", "brand": "petamus", "publisher": "", "costPrice": 10000, "sellPrice": 10000, "memo": ""}, {"id": "tbm_pt_063", "name": "AR Book - Stories of Witches", "brand": "petamus", "publisher": "", "costPrice": 10000, "sellPrice": 10000, "memo": ""}, {"id": "tbm_pt_064", "name": "AR Book (월별)", "brand": "petamus", "publisher": "", "costPrice": 10000, "sellPrice": 10000, "memo": ""}, {"id": "tbm_pt_065", "name": "AR Book Report", "brand": "petamus", "publisher": "", "costPrice": 0, "sellPrice": 5000, "memo": ""}, {"id": "tbm_pt_066", "name": "Reading HW Book (B부터)", "brand": "petamus", "publisher": "", "costPrice": 12500, "sellPrice": 17000, "memo": ""}, {"id": "tbm_pt_067", "name": "Reading HW Book (A부터)", "brand": "petamus", "publisher": "", "costPrice": 12500, "sellPrice": 17000, "memo": ""}, {"id": "tbm_pt_068", "name": "Reading HW Book (Unicorn)", "brand": "petamus", "publisher": "", "costPrice": 12500, "sellPrice": 17000, "memo": ""}, {"id": "tbm_pt_069", "name": "Reading HW Book (C부터)", "brand": "petamus", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pt_070", "name": "Science WB", "brand": "petamus", "publisher": "", "costPrice": 0, "sellPrice": 5000, "memo": ""}, {"id": "tbm_pt_071", "name": "Math Code 4권 Q1", "brand": "petamus", "publisher": "", "costPrice": 25200, "sellPrice": 34020, "memo": ""}, {"id": "tbm_pt_072", "name": "Math Code 3권 M1", "brand": "petamus", "publisher": "", "costPrice": 25200, "sellPrice": 34020, "memo": ""}, {"id": "tbm_pt_073", "name": "Math Code 5권 M2", "brand": "petamus", "publisher": "", "costPrice": 25200, "sellPrice": 34020, "memo": ""}, {"id": "tbm_pt_074", "name": "Create703 lv 3-2", "brand": "petamus", "publisher": "", "costPrice": 28800, "sellPrice": 38880, "memo": ""}, {"id": "tbm_pt_075", "name": "Create703 lv 3-3", "brand": "petamus", "publisher": "", "costPrice": 28800, "sellPrice": 38880, "memo": ""}, {"id": "tbm_pt_076", "name": "Create703 lv 3-4", "brand": "petamus", "publisher": "", "costPrice": 28800, "sellPrice": 38880, "memo": ""}, {"id": "tbm_pt_077", "name": "Create703 lv 3-5", "brand": "petamus", "publisher": "", "costPrice": 28800, "sellPrice": 38880, "memo": ""}, {"id": "tbm_pt_078", "name": "Create703 lv 3-6", "brand": "petamus", "publisher": "", "costPrice": 28800, "sellPrice": 38880, "memo": ""}, {"id": "tbm_pt_079", "name": "Create703 lv 3-7", "brand": "petamus", "publisher": "", "costPrice": 28800, "sellPrice": 38880, "memo": ""}, {"id": "tbm_pg_001", "name": "Phonics Monster 1 SB+WB", "brand": "pangram", "publisher": "이퓨처", "costPrice": 16100, "sellPrice": 21000, "memo": ""}, {"id": "tbm_pg_002", "name": "Phonics Monster 2 SB+WB", "brand": "pangram", "publisher": "이퓨처", "costPrice": 14700, "sellPrice": 21000, "memo": ""}, {"id": "tbm_pg_003", "name": "Phonics Monster 3 SB+WB", "brand": "pangram", "publisher": "이퓨처", "costPrice": 14700, "sellPrice": 21000, "memo": ""}, {"id": "tbm_pg_004", "name": "Phonics Monster 4 SB+WB", "brand": "pangram", "publisher": "이퓨처", "costPrice": 14700, "sellPrice": 21000, "memo": ""}, {"id": "tbm_pg_005", "name": "Phonics Monster ASAP", "brand": "pangram", "publisher": "이퓨처", "costPrice": 16100, "sellPrice": 23000, "memo": ""}, {"id": "tbm_pg_006", "name": "Habitus 1-1", "brand": "pangram", "publisher": "", "costPrice": 15000, "sellPrice": 19500, "memo": ""}, {"id": "tbm_pg_007", "name": "Habitus 1-2", "brand": "pangram", "publisher": "", "costPrice": 15000, "sellPrice": 19500, "memo": ""}, {"id": "tbm_pg_008", "name": "Habitus 1-3", "brand": "pangram", "publisher": "", "costPrice": 15000, "sellPrice": 19500, "memo": ""}, {"id": "tbm_pg_009", "name": "Habitus 1-4", "brand": "pangram", "publisher": "", "costPrice": 15000, "sellPrice": 19500, "memo": ""}, {"id": "tbm_pg_010", "name": "Habitus 1-5", "brand": "pangram", "publisher": "", "costPrice": 15000, "sellPrice": 19500, "memo": ""}, {"id": "tbm_pg_011", "name": "Habitus 1-6", "brand": "pangram", "publisher": "", "costPrice": 15000, "sellPrice": 19500, "memo": ""}, {"id": "tbm_pg_012", "name": "Onebite 300-1", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_013", "name": "Onebite 300-2", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_014", "name": "Onebite 300-3", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_015", "name": "Onebite 300-4", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_016", "name": "Onebite 300-5", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_017", "name": "Onebite 300-6", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_018", "name": "Onebite 300-7", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_019", "name": "Onebite 300-8", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_020", "name": "Onebite 300-9", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_021", "name": "Onebite 600-1", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_022", "name": "Onebite 600-2", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_023", "name": "Onebite 600-3", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_024", "name": "Onebite 600-4", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_025", "name": "Onebite 600-5", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_026", "name": "Onebite 600-6", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_027", "name": "Onebite 600-7", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_028", "name": "Onebite 600-8", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_029", "name": "Onebite 600-9", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_030", "name": "Onebite 600-10", "brand": "pangram", "publisher": "", "costPrice": 13000, "sellPrice": 17500, "memo": ""}, {"id": "tbm_pg_031", "name": "WonderSkills Easy Reading 1", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_032", "name": "WonderSkills Easy Reading 2", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_033", "name": "WonderSkills Easy Reading 3", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_034", "name": "WonderSkills Easy Reading Plus 1", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_035", "name": "WonderSkills Easy Plus 2", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_036", "name": "WonderSkills Easy Plus Reading 1", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_037", "name": "WonderSkills Easy Plus Reading 2", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_038", "name": "WonderSkills Easy Plus Reading 3", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_039", "name": "WonderSkills Rich Reading Basic 1", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_040", "name": "WonderSkills Rich Reading Basic 2", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_041", "name": "WonderSkills Rich Reading Basic 3", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_042", "name": "WonderSkills Rich Reading Intermediate 1", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_043", "name": "WonderSkills Rich Reading Intermediate 2", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_044", "name": "WonderSkills Rich Reading Intermediate 3", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_045", "name": "WonderSkills Rich Reading Intermediate Plus 1", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_046", "name": "Wonderful World Basic 1", "brand": "pangram", "publisher": "", "costPrice": 11550, "sellPrice": 16500, "memo": ""}, {"id": "tbm_pg_047", "name": "Wonderful World Basic 2", "brand": "pangram", "publisher": "", "costPrice": 11550, "sellPrice": 16500, "memo": ""}, {"id": "tbm_pg_048", "name": "Wonderful World Basic 3", "brand": "pangram", "publisher": "", "costPrice": 11550, "sellPrice": 16500, "memo": ""}, {"id": "tbm_pg_049", "name": "Wonderful World Basic 4", "brand": "pangram", "publisher": "", "costPrice": 12600, "sellPrice": 18000, "memo": ""}, {"id": "tbm_pg_050", "name": "Bricks 300 Vocabs", "brand": "pangram", "publisher": "브릭스", "costPrice": 7700, "sellPrice": 11000, "memo": ""}, {"id": "tbm_pg_051", "name": "Bricks 900 Vocabs Review", "brand": "pangram", "publisher": "브릭스", "costPrice": 7700, "sellPrice": 11000, "memo": ""}, {"id": "tbm_pg_052", "name": "My First Grammar 1", "brand": "pangram", "publisher": "", "costPrice": 15200, "sellPrice": 22000, "memo": ""}, {"id": "tbm_pg_053", "name": "My First Grammar 2", "brand": "pangram", "publisher": "", "costPrice": 15200, "sellPrice": 22000, "memo": ""}, {"id": "tbm_pg_054", "name": "Vocabulary Live Basic 1", "brand": "pangram", "publisher": "", "costPrice": 8400, "sellPrice": 12000, "memo": ""}, {"id": "tbm_pg_055", "name": "Vocabulary Live 1 (Intermediate)", "brand": "pangram", "publisher": "", "costPrice": 8500, "sellPrice": 12000, "memo": ""}, {"id": "tbm_pg_056", "name": "Vocabulary Live 2 (Intermediate)", "brand": "pangram", "publisher": "", "costPrice": 8500, "sellPrice": 12000, "memo": ""}, {"id": "tbm_pg_057", "name": "The Best Grammar 1", "brand": "pangram", "publisher": "", "costPrice": 14000, "sellPrice": 20000, "memo": ""}, {"id": "tbm_pg_058", "name": "The Best Grammar 2", "brand": "pangram", "publisher": "", "costPrice": 14000, "sellPrice": 20000, "memo": ""}, {"id": "tbm_pg_059", "name": "Onebite 사전", "brand": "pangram", "publisher": "", "costPrice": 0, "sellPrice": 17000, "memo": ""}];
+  saveYearData();
+}
 function loadSampleTB(){
   CY.textbooks=[{"brand":"altiora","cls":"4 Mare","type":"전체","q1":43000,"q2":37000,"q3":0,"q4":50000},{"brand":"altiora","cls":"5 Aqua","type":"전체","q1":21000,"q2":22000,"q3":27000,"q4":38000},{"brand":"altiora","cls":"6-1 Viento","type":"전체","q1":22000,"q2":27000,"q3":22000,"q4":16000},{"brand":"altiora","cls":"6-2 Arbor","type":"전체","q1":27000,"q2":38000,"q3":0,"q4":16500},{"brand":"altiora","cls":"6-2 Flos","type":"전체","q1":27000,"q2":38000,"q3":0,"q4":16500},{"brand":"altiora","cls":"7-2 Cambridge","type":"전체","q1":22000,"q2":34000,"q3":32500,"q4":49000},{"brand":"altiora","cls":"7-2 Harvard","type":"전체","q1":22000,"q2":34000,"q3":32500,"q4":49000},{"brand":"altiora","cls":"7-3 Oxford","type":"전체","q1":38500,"q2":56000,"q3":17500,"q4":31500},{"brand":"pangram","cls":"PK6A 월수금","type":"전체","q1":37000,"q2":130500,"q3":93000,"q4":39000},{"brand":"pangram","cls":"PK6B 화목","type":"전체","q1":73500,"q2":73500,"q3":73500,"q4":56500},{"brand":"pangram","cls":"PK6D 화목","type":"전체","q1":111000,"q2":111000,"q3":73500,"q4":74000},{"brand":"pangram","cls":"PK6H 화목","type":"전체","q1":111000,"q2":111000,"q3":73500,"q4":74000},{"brand":"pangram","cls":"PK7A 월수금","type":"전체","q1":73500,"q2":70500,"q3":73500,"q4":56500},{"brand":"pangram","cls":"PK7C 월수금","type":"전체","q1":73500,"q2":70500,"q3":73500,"q4":56500},{"brand":"pangram","cls":"PK7B 화목","type":"전체","q1":73500,"q2":70500,"q3":73500,"q4":56500},{"brand":"pangram","cls":"PK7D 화목","type":"전체","q1":73500,"q2":73500,"q3":73500,"q4":74000},{"brand":"pangram","cls":"PK7H 화목","type":"전체","q1":73500,"q2":73500,"q3":73500,"q4":74000},{"brand":"pangram","cls":"Tier 1C 월수금","type":"전체","q1":39000,"q2":41000,"q3":29000,"q4":52000},{"brand":"pangram","cls":"Tier 3C 월수금","type":"전체","q1":41000,"q2":38000,"q3":38000,"q4":30000},{"brand":"petamus","cls":"Phoenix Lv.1","type":"주3회","q1":267940,"q2":66220,"q3":121920,"q4":125825},{"brand":"petamus","cls":"Phoenix Lv.1","type":"주5회","q1":379720,"q2":199820,"q3":263700,"q4":194705},{"brand":"petamus","cls":"Pegasus Lv.2","type":"주3회","q1":267940,"q2":66220,"q3":121920,"q4":125825},{"brand":"petamus","cls":"Pegasus Lv.2","type":"주5회","q1":379720,"q2":199820,"q3":263700,"q4":194705},{"brand":"petamus","cls":"Griffin Lv.3","type":"주3회","q1":257240,"q2":81930,"q3":120000,"q4":120000},{"brand":"petamus","cls":"Griffin Lv.3","type":"주5회","q1":369020,"q2":214820,"q3":250000,"q4":200000},{"brand":"petamus","cls":"Unicorn Lv.4","type":"주3회","q1":226570,"q2":121200,"q3":120000,"q4":100000},{"brand":"petamus","cls":"Unicorn Lv.4","type":"주5회","q1":338350,"q2":254100,"q3":220000,"q4":180000},{"brand":"petamus","cls":"Kelpie","type":"주3회","q1":117500,"q2":17500,"q3":107500,"q4":17500}];
   saveYearData();
@@ -1106,7 +1321,8 @@ function loadSampleTB(){
 const PAGE_TITLES={
   dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
   special:'특이사항 체크', master:'단가 설정', textbook:'외부교재비 설정',
-  yearend:'학년도 관리', sms:'SMS 템플릿', classconfig:'반 목록 관리'
+  yearend:'학년도 관리',
+  calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리'
 };
 function showPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
@@ -1303,20 +1519,25 @@ let currentBilling=[],currentBillingMonth=0;
 // 차감 데이터: { studentId: {days, rate, amount, reason, memo} }
 let deductions={};
 function restoreLastBilling(){
-  // 이미 결과가 표시 중이면 스킵
   if(currentBilling.length > 0) return;
   const billings = CY.billings||{};
   const yms = Object.keys(billings).sort().reverse();
+  // ts 기준 가장 최근 preview 찾기
+  let latestYm = null, latestTs = 0;
   for(const ym of yms){
     const b = billings[ym];
-    if(b.closed || b.preview){
-      const year = parseInt(ym.slice(0,4));
-      const month = parseInt(ym.slice(4));
-      document.getElementById('billing-year').value = year;
-      document.getElementById('billing-month').value = month;
-      generateBilling();
-      return;
+    if(b.closed){ latestYm = ym; break; }
+    if(b.preview){
+      const ts = b.preview.ts||0;
+      if(ts > latestTs){ latestTs = ts; latestYm = ym; }
     }
+  }
+  if(latestYm){
+    const year = parseInt(latestYm.slice(0,4));
+    const month = parseInt(latestYm.slice(4));
+    document.getElementById('billing-year').value = year;
+    document.getElementById('billing-month').value = month;
+    generateBilling();
   }
 }
 function generateBilling(){
@@ -1353,11 +1574,10 @@ function generateBilling(){
     // 임시 결과 저장 (마감 전)
     if(!CY.billings) CY.billings={};
     if(!CY.billings[ym]) CY.billings[ym]={};
-    CY.billings[ym].preview = {
-      year, month,
-      items: currentBilling.map(({s,a})=>({sid:s.id, a}))
-    };
+    CY.billings[ym].preview = {year, month, ts: Date.now()};
     saveYearData();
+    // Firebase에 billings만 별도 저장
+    fbSave('data_'+CY.year+'/billings', CY.billings).catch(e=>console.warn('billings 저장 실패:',e));
   }
   const tot=arr=>arr.reduce((a,b)=>a+b.a.total-(deductions[b.s.id]?.amount||0),0);
   document.getElementById('billing-totals').style.display='grid';
@@ -1486,17 +1706,123 @@ function updateBillingClassFilter(){
   (bf?[bf]:Object.keys(CLASSES)).forEach(b=>CLASSES[b].forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}));
 }
 
+
+// ── 청구서 컬럼 필터 ──
+let billingFilters = {brand:'', 'class':'', item:''};
+
+function openBillingFilter(type, thEl){
+  // 기존 팝업 제거
+  document.querySelectorAll('.billing-filter-popup').forEach(e=>e.remove());
+
+  const popup = document.createElement('div');
+  popup.className = 'billing-filter-popup';
+  popup.style.cssText = 'position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;min-width:160px;max-height:280px;overflow-y:auto;padding:6px 0;';
+
+  let options = [];
+  if(type==='brand'){
+    options = [{val:'',label:'전체'},{val:'altiora',label:'알티오라'},{val:'pangram',label:'팬그램'},{val:'petamus',label:'페타무스'}];
+  } else if(type==='class'){
+    const brand = billingFilters.brand;
+    const classes = brand ? CLASSES[brand] : [...new Set(currentBilling.map(x=>x.s.cls))].sort();
+    options = [{val:'',label:'전체'},...classes.map(c=>({val:c,label:c}))];
+  } else if(type==='item'){
+    options = [
+      {val:'',label:'전체'},
+      {val:'care',label:'돌봄'},
+      {val:'onetone',label:'1:1 수업'},
+      {val:'shuttle',label:'셔틀'},
+      {val:'ext_textbook',label:'외부교재비'},
+      {val:'split',label:'분할결제'},
+    ];
+  }
+
+  const cur = billingFilters[type]||'';
+  popup.innerHTML = options.map(o=>`
+    <div onclick="setBillingFilter('${type}','${o.val}',this.closest('.billing-filter-popup'))"
+      style="padding:7px 14px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;${o.val===cur?'background:var(--surface2);font-weight:600;':''}"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='${o.val===cur?'var(--surface2)':''}'"
+    >${o.val===cur?'✓ ':''} ${o.label}</div>`).join('');
+
+  // 위치 계산
+  const rect = thEl.getBoundingClientRect();
+  popup.style.top = (rect.bottom+4)+'px';
+  popup.style.left = rect.left+'px';
+  document.body.appendChild(popup);
+
+  // 외부 클릭 시 닫기
+  setTimeout(()=>{
+    document.addEventListener('click', function close(e){
+      if(!popup.contains(e.target)){popup.remove();document.removeEventListener('click',close);}
+    });
+  },10);
+}
+
+function resetBillingFilters(){
+  billingFilters = {brand:'', 'class':'', item:''};
+  document.getElementById('bf-search').value='';
+  document.getElementById('bf-search-clear').style.display='none';
+  document.getElementById('bf-reset-btn').style.display='none';
+  renderBillingTable();
+}
+function toggleBillingItemFilter(item){
+  billingFilters.item = billingFilters.item===item ? '' : item;
+  const hasFilter = Object.values(billingFilters).some(v=>v);
+  const clearBtn = document.getElementById('bf-clear-all');
+  if(clearBtn) clearBtn.style.display = hasFilter ? 'inline-block' : 'none';
+  renderBillingTable();
+}
+function setBillingFilter(type, val, popup){
+  billingFilters[type] = val;
+  // 필터 활성화 시 초기화 버튼 표시
+  const hasActiveFilter = Object.values(billingFilters).some(v=>v);
+  const btn = document.getElementById('bf-reset-btn');
+  if(btn) btn.style.display = hasActiveFilter ? '' : 'none';
+  if(popup) popup.remove();
+  // 헤더 표시 업데이트
+  const labels = {brand:{altiora:'알티오라',pangram:'팬그램',petamus:'페타무스'},item:{care:'돌봄',onetone:'1:1',shuttle:'셔틀',ext_textbook:'교재비',split:'분할'}};
+  const el = document.getElementById('bfh-'+type);
+  if(el) el.textContent = val ? ('('+( labels[type]?.[val]||val)+') ') : '';
+  // 초기화 버튼 표시
+  const hasFilter = Object.values(billingFilters).some(v=>v);
+  const clearBtn = document.getElementById('bf-clear-all');
+  if(clearBtn) clearBtn.style.display = hasFilter ? 'inline-block' : 'none';
+  renderBillingTable();
+}
+
+function clearAllBillingFilters(){
+  billingFilters = {brand:'', 'class':'', item:''};
+  ['brand','class','item'].forEach(t=>{const el=document.getElementById('bfh-'+t);if(el)el.textContent='';});
+  document.getElementById('bf-brand').value='';
+  document.getElementById('bf-class').value='';
+  document.getElementById('bf-search').value='';
+  document.getElementById('bf-search-clear').style.display='none';
+  document.getElementById('bf-clear-all').style.display='none';
+  renderBillingTable();
+}
+// ── /청구서 컬럼 필터 ──
+
 function renderBillingTable(){
   const month=currentBillingMonth;
   const isQ=isQM(month),isS=isSM(month);
-  const bf=document.getElementById('bf-brand').value;
-  const cf=document.getElementById('bf-class').value;
   const bq=(document.getElementById('bf-search')?.value||'').toLowerCase();
-  const rows=currentBilling.filter(x=>
-    (!bf||x.s.brand===bf)&&
-    (!cf||x.s.cls===cf)&&
-    (!bq||x.s.name.includes(bq)||x.s.ename.toLowerCase().includes(bq))
-  );
+  const bfBrand = document.getElementById('bf-brand')?.value||'';
+  const bfClass = document.getElementById('bf-class')?.value||'';
+  const rows=currentBilling.filter(({s,a})=>{
+    if(bfBrand && s.brand!==bfBrand) return false;
+    if(bfClass && s.cls!==bfClass) return false;
+    if(bq && !s.name.includes(bq) && !(s.ename||'').toLowerCase().includes(bq)) return false;
+    if(billingFilters.item==='tuition' && !a.tuition) return false;
+    if(billingFilters.item==='pkg' && !a.textbook_pkg) return false;
+    if(billingFilters.item==='shuttle' && !a.shuttle) return false;
+    if(billingFilters.item==='ext_textbook' && !a.ext_textbook) return false;
+    if(billingFilters.item==='material' && !a.material_alt) return false;
+    if(billingFilters.item==='science' && !a.science) return false;
+    if(billingFilters.item==='snack' && !a.snack) return false;
+    if(billingFilters.item==='care' && !a.care) return false;
+    if(billingFilters.item==='onetone' && !a.onetone) return false;
+    if(billingFilters.item==='split' && !s.split) return false;
+    return true;
+  });
   const hasShuttle=isQ,hasPkg=isQ,hasExtTB=isQ;
   // 알티오라 재료비: 반기, 페타무스 과학재료비+간식비: 분기
   const hasMat=isS;   // 알티오라 재료비
@@ -1505,15 +1831,17 @@ function renderBillingTable(){
   const hasCare=rows.some(x=>x.a.care>0);
   const hasOT=rows.some(x=>x.a.onetone>0);
   document.getElementById('billing-thead').innerHTML=`<tr style="background:var(--surface2,#f0eff8);">
-    <th>브랜드</th><th>반</th><th>원생명</th><th class="text-right">교습비</th>
-    ${hasPkg?'<th class="text-right">패키지교재비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>':''}
-    ${hasShuttle?'<th class="text-right">셔틀비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>':''}
-    ${hasExtTB?'<th class="text-right">외부교재비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>':''}
-    ${hasMat?'<th class="text-right">재료비<div style="font-weight:400;font-size:10px;color:var(--text3)">반기</div></th>':''}
-    ${hasSci?'<th class="text-right">과학재료비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>':''}
-    ${hasSnack?'<th class="text-right">간식비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>':''}
-    ${hasCare?'<th class="text-right">돌봄</th>':''}
-    ${hasOT?'<th class="text-right">1:1</th>':''}
+    <th>브랜드</th><th>반</th>
+    <th>원생명</th>
+    <th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('tuition')" title="교습비 필터">교습비${billingFilters.item==='tuition'?' ✓':' ▾'}</th>
+    ${hasPkg?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('pkg')">패키지교재비${billingFilters.item==='pkg'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasShuttle?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('shuttle')" title="셔틀 있는 원생만 보기">셔틀비${billingFilters.item==='shuttle'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasExtTB?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('ext_textbook')" title="외부교재비 있는 원생만 보기">외부교재비${billingFilters.item==='ext_textbook'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasMat?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('material')">재료비${billingFilters.item==='material'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">반기</div></th>`:''}
+    ${hasSci?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('science')">과학재료비${billingFilters.item==='science'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasSnack?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('snack')">간식비${billingFilters.item==='snack'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasCare?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('care')" title="돌봄 있는 원생만 보기">돌봄${billingFilters.item==='care'?' ✓':' ▾'}</th>`:''}
+    ${hasOT?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('onetone')" title="1:1 있는 원생만 보기">1:1${billingFilters.item==='onetone'?' ✓':' ▾'}</th>`:''}
     <th class="text-right">최종 합계</th><th>비고</th></tr>`;
   if(!rows.length){document.getElementById('billing-tbody').innerHTML=`<tr><td colspan="12"><div class="empty-state text-muted text-sm">해당 조건 원생 없음</div></td></tr>`;document.getElementById('billing-class-summary').innerHTML='';return;}
   document.getElementById('billing-tbody').innerHTML=rows.map(({s,a})=>{
@@ -1534,17 +1862,19 @@ function renderBillingTable(){
         <div class="deduct-cell" onclick="openDeductModal('${s.id}')" title="클릭하여 차감 입력"
           style="cursor:pointer;position:relative;">
           ${(()=>{
-            const siblingAmt = a.sibling||0;
             const deductAmt = deductions[s.id]?.amount||0;
-            const originalTuition = a.tuition + siblingAmt; // 할인 전 원래 교습비
-            const netTuition = a.tuition - deductAmt;       // 최종 납부 교습비
-            const hasDeduct = siblingAmt>0 || deductAmt>0;
+            // 차감 있으면 형제할인 무효 — 원래 교습비로 청구
+            const effectiveSibling = deductAmt > 0 ? 0 : (a.sibling||0);
+            const baseTuition = a.tuition + (a.sibling||0); // 할인 전 원래 교습비
+            const displayTuition = baseTuition - effectiveSibling; // 표시 교습비
+            const netTuition = displayTuition - deductAmt;  // 최종 납부
+            const hasDeduct = effectiveSibling>0 || deductAmt>0;
             return hasDeduct
               ? `<div style="font-weight:700;color:var(--accent2);">${won(netTuition)}</div>
-                 <div style="font-size:11px;color:var(--text3);margin-top:1px;">(원 ${won(originalTuition)})</div>
-                 ${siblingAmt?`<div class="amount-breakdown">형제할인 -${won(siblingAmt)}</div>`:''}
+                 <div style="font-size:11px;color:var(--text3);margin-top:1px;">(원 ${won(baseTuition)})</div>
+                 ${effectiveSibling?`<div class="amount-breakdown">형제할인 -${won(effectiveSibling)}</div>`:''}
                  ${deductAmt?`<div class="amount-breakdown" style="color:var(--red);">${deductions[s.id].reason} -${won(deductAmt)}<span onclick="event.stopPropagation();clearDeduct('${s.id}')" style="margin-left:4px;cursor:pointer;font-size:11px;">✕</span></div>`:''}`
-              : won(a.tuition);
+              : won(displayTuition);
           })()}
         </div>
       </td>
@@ -1556,11 +1886,63 @@ function renderBillingTable(){
       ${hasSnack?`<td class="mono text-right">${a.snack?won(a.snack):'<span class="text-muted">-</span>'}</td>`:''}
       ${hasCare?`<td class="mono text-right">${a.care?won(a.care):'<span class="text-muted">-</span>'}</td>`:''}
       ${hasOT?`<td class="mono text-right">${a.onetone?won(a.onetone):'<span class="text-muted">-</span>'}</td>`:''}
-      <td class="mono text-right amount-total">${won(a.total - (deductions[s.id]?.amount||0))}</td>
+      <td class="mono text-right amount-total">${(()=>{
+        const d = deductions[s.id]?.amount||0;
+        const effSib = d>0 ? 0 : (a.sibling||0);
+        const cancelledSib = d>0 ? (a.sibling||0) : 0;
+        return won(a.total - d + cancelledSib);
+      })()}</td>
       <td style="white-space:nowrap;">${flags.join(' ')}</td></tr>`;
   }).join('');
-  const ct={};rows.forEach(({s,a})=>{if(!ct[s.cls])ct[s.cls]={brand:s.brand,count:0,total:0};ct[s.cls].count++;ct[s.cls].total+=(a.total-(deductions[s.id]?.amount||0));});
-  document.getElementById('billing-class-summary').innerHTML=`<div style="border-top:1px solid var(--border);padding-top:10px;"><div class="text-xs text-muted mb-8" style="font-weight:600;text-transform:uppercase;letter-spacing:.5px;">반별 합계</div><div style="display:flex;flex-wrap:wrap;gap:8px;">${Object.entries(ct).map(([cls,{count,total}])=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 12px;min-width:150px;"><div style="font-size:11px;color:var(--text3);margin-bottom:3px;">${cls} · ${count}명</div><div class="mono" style="font-size:14px;font-weight:700;color:var(--accent)">${won(total)}</div></div>`).join('')}</div></div>`;
+  const ct={};
+  rows.forEach(({s,a})=>{
+    if(!ct[s.cls]) ct[s.cls]={brand:s.brand,count:0,total:0,tuition:0,shuttle:0,textbook_pkg:0,ext_textbook:0,material:0,science:0,snack:0,care:0,onetone:0};
+    const deduct = deductions[s.id]?.amount||0;
+    ct[s.cls].count++;
+    ct[s.cls].total += a.total - deduct;
+    ct[s.cls].tuition += a.tuition;
+    ct[s.cls].shuttle += a.shuttle||0;
+    ct[s.cls].textbook_pkg += a.textbook_pkg||0;
+    ct[s.cls].ext_textbook += a.ext_textbook||0;
+    ct[s.cls].material += (a.material_alt||0);
+    ct[s.cls].science += a.science||0;
+    ct[s.cls].snack += a.snack||0;
+    ct[s.cls].care += a.care||0;
+    ct[s.cls].onetone += a.onetone||0;
+  });
+  // 테이블 하단에 구분별 소계 행 추가
+  const grandTotal = Object.values(ct).reduce((s,v)=>s+v.total,0);
+  const grandTuition = Object.values(ct).reduce((s,v)=>s+v.tuition,0);
+  const grandPkg = Object.values(ct).reduce((s,v)=>s+v.textbook_pkg,0);
+  const grandShuttle = Object.values(ct).reduce((s,v)=>s+v.shuttle,0);
+  const grandExtTb = Object.values(ct).reduce((s,v)=>s+v.ext_textbook,0);
+  const grandMat = Object.values(ct).reduce((s,v)=>s+v.material,0);
+  const grandSci = Object.values(ct).reduce((s,v)=>s+v.science,0);
+  const grandSnack = Object.values(ct).reduce((s,v)=>s+v.snack,0);
+  const grandCare = Object.values(ct).reduce((s,v)=>s+v.care,0);
+  const grandOT = Object.values(ct).reduce((s,v)=>s+v.onetone,0);
+  const totalCount = Object.values(ct).reduce((s,v)=>s+v.count,0);
+
+  const subtitleStyle = 'background:var(--surface2);font-weight:700;font-size:12px;color:var(--text2);padding:8px 12px;text-align:right;border-top:2px solid var(--border);';
+  const totalStyle = 'background:var(--surface2);font-weight:800;font-size:13px;color:var(--accent);padding:8px 12px;text-align:right;border-top:2px solid var(--border);';
+  const labelStyle = 'background:var(--surface2);font-weight:700;font-size:12px;color:var(--text2);padding:8px 12px;border-top:2px solid var(--border);';
+
+  const subtotalRow = `<tr>
+    <td colspan="3" style="${labelStyle}">합계 · ${totalCount}명</td>
+    <td style="${subtitleStyle}">${grandTuition?won(grandTuition):'-'}</td>
+    ${hasPkg?`<td style="${subtitleStyle}">${grandPkg?won(grandPkg):'-'}</td>`:''}
+    ${hasShuttle?`<td style="${subtitleStyle}">${grandShuttle?won(grandShuttle):'-'}</td>`:''}
+    ${hasExtTB?`<td style="${subtitleStyle}">${grandExtTb?won(grandExtTb):'-'}</td>`:''}
+    ${hasMat?`<td style="${subtitleStyle}">${grandMat?won(grandMat):'-'}</td>`:''}
+    ${hasSci?`<td style="${subtitleStyle}">${grandSci?won(grandSci):'-'}</td>`:''}
+    ${hasSnack?`<td style="${subtitleStyle}">${grandSnack?won(grandSnack):'-'}</td>`:''}
+    ${hasCare?`<td style="${subtitleStyle}">${grandCare?won(grandCare):'-'}</td>`:''}
+    ${hasOT?`<td style="${subtitleStyle}">${grandOT?won(grandOT):'-'}</td>`:''}
+    <td style="${totalStyle}">${won(grandTotal)}</td>
+    <td style="${labelStyle}"></td>
+  </tr>`;
+  document.getElementById('billing-tbody').innerHTML += subtotalRow;
+  document.getElementById('billing-class-summary').innerHTML='';
 }
 
 function exportBillingCSV(){
@@ -1607,6 +1989,7 @@ function renderStudentTable(){
     if(spf==='sibling'&&!s.sibling)return false;
     if(spf==='shuttle_none'&&s.shuttle!=='개별')return false;
     if(spf==='shuttle_half'&&s.shuttle!=='등원편도'&&s.shuttle!=='하원편도')return false;
+    if(spf==='shuttle_half_ops'&&!(s.shuttleHalf&&(s.shuttle==='등원편도'||s.shuttle==='하원편도')))return false;
     if(spf==='care'&&s.care==='없음')return false;
     if(spf==='onetone'&&!s.onetone)return false;
 
@@ -1704,11 +2087,18 @@ function updateClassOptions(){
   document.getElementById('s-class').innerHTML=CLASSES[b].map(c=>`<option value="${c}">${c}</option>`).join('');
   updateBrandFields();
 }
-function updateCareFields(){ /* 이달 돌봄 변경 제거됨 */ }
+function updateCareFields(){
+  const care = document.getElementById('s-care')?.value;
+  const group = document.getElementById('s-care-days-group');
+  if(group) group.style.display = care && care!=='없음' ? '' : 'none';
+}
 function updateOnetoneFields(){
   const yn = document.getElementById('s-onetone-yn')?.value;
-  const group = document.getElementById('s-ot-paytype-group');
-  if(group) group.style.display = yn==='1' ? 'flex' : 'none';
+  const isYes = yn==='1';
+  const ptGroup = document.getElementById('s-ot-paytype-group');
+  const daysGroup = document.getElementById('s-ot-days-group');
+  if(ptGroup) ptGroup.style.display = isYes ? '' : 'none';
+  if(daysGroup) daysGroup.style.display = isYes ? '' : 'none';
 }
 function updateBrandFields(){
   const b=document.getElementById('s-brand').value;
@@ -1790,6 +2180,15 @@ function clearSibling(){
     toast('형제 연결이 해제되었습니다.');
   }
 }
+function updateShuttleHalf(){
+  const val = document.getElementById('s-shuttle')?.value;
+  const row = document.getElementById('shuttle-half-row');
+  if(row) row.style.display = (val==='등원편도'||val==='하원편도') ? 'block' : 'none';
+  if(val!=='등원편도'&&val!=='하원편도'){
+    const cb = document.getElementById('s-shuttle-half');
+    if(cb) cb.checked = false;
+  }
+}
 function updateSiblingField(){
   const checked = document.getElementById('s-sibling').checked;
   document.getElementById('sibling-link-row').style.display = checked ? 'flex' : 'none';
@@ -1808,11 +2207,26 @@ function openStudentModal(idx=-1){
   const htimeSel3 = document.getElementById('s-htime');
   if(htimeSel3 && s?.htime) htimeSel3.value = s.htime;
   v('s-shuttle',s?.shuttle||'왕복');v('s-paytype',s?.paytype||'월납');
+  updateShuttleHalf();
+  document.getElementById('s-shuttle-half').checked = !!s?.shuttleHalf;
   v('s-care',s?.care||'없음');
   // 1:1: onetone>0이면 있음, 기존 금액값도 있음으로 처리
   const otYn = (s?.onetone && parseInt(s.onetone)>0) ? '1' : '0';
   document.getElementById('s-onetone-yn').value = otYn;
+  const otDaysVal = s?.otDays||'';
+  document.getElementById('s-ot-days').value = otDaysVal;
+  document.querySelectorAll('.ot-day-check').forEach(cb=>{
+    cb.checked = otDaysVal.split(',').map(d=>d.trim()).includes(cb.value);
+    cb.addEventListener('change', ()=>{
+      document.getElementById('s-ot-days').value = 
+        Array.from(document.querySelectorAll('.ot-day-check:checked')).map(c=>c.value).join(',');
+    });
+  });
   updateCareFields(); updateOnetoneFields();v('s-receipt',s?.receipt||'항상발급');
+  // 돌봄 요일 체크 복원
+  document.querySelectorAll('.care-day-check').forEach(cb=>{
+    cb.checked = Array.isArray(s?.careDays) && s.careDays.includes(cb.value);
+  });
   v('s-sms',s?.sms||'어머니');v('s-memo',s?.memo);
   document.getElementById('s-sibling').checked=!!s?.sibling;
   document.getElementById('s-split').checked=!!s?.split;
@@ -1846,10 +2260,11 @@ function saveStudent(){
     brand:document.getElementById('s-brand').value,cls:document.getElementById('s-class').value,
     name,ename:document.getElementById('s-ename').value.trim(),gender:document.getElementById('s-gender').value,
     htime:document.getElementById('s-htime').value,freq:document.getElementById('s-freq').value,
-    shuttle:document.getElementById('s-shuttle').value,paytype:document.getElementById('s-paytype').value,
+    shuttle:document.getElementById('s-shuttle').value,shuttleHalf:document.getElementById('s-shuttle-half')?.checked||false,paytype:document.getElementById('s-paytype').value,
     sibling:document.getElementById('s-sibling').checked,
     siblingId:document.getElementById('s-sibling').checked?(document.getElementById('s-sibling-id').value||''):'',
-    care:document.getElementById('s-care').value,careOverride:'',
+    care:document.getElementById('s-care').value,
+    careDays:Array.from(document.querySelectorAll('.care-day-check:checked')).map(c=>c.value),careOverride:'',
     onetone:document.getElementById('s-onetone-yn')?.value==='1'?1:0,
     customTuition:0,
     otPayType:document.getElementById('s-ot-paytype')?.value||'분기',
@@ -2242,6 +2657,181 @@ function saveTextbook(){
   saveYearData();closeModal('modal-textbook');renderTextbookTable();toast(editTBIdx>=0?'교재비가 수정되었습니다.':'교재비가 추가되었습니다.');
 }
 function deleteTextbook(idx){const t=CY.textbooks[idx];showConfirm(`'${t?.label||'이 항목'}'을 삭제하시겠습니까?`,()=>{CY.textbooks.splice(idx,1);saveYearData();renderTextbookTable();toast('삭제되었습니다.','warn');});}
+
+// ── 교재 마스터 ──
+function TBM(){ return CY.tbMaster||[]; }
+
+function switchTbTab(tab, el){
+  document.querySelectorAll('#page-textbook .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tb-pane-assign').style.display = tab==='assign'?'block':'none';
+  document.getElementById('tb-pane-master').style.display = tab==='master'?'block':'none';
+  if(tab==='master') renderTbMaster();
+}
+
+function renderTbMaster(){
+  const q = (document.getElementById('tbm-search')?.value||'').toLowerCase();
+  const bf = document.getElementById('tbm-filter-brand')?.value||'';
+  const list = TBM().filter(t=>
+    (!bf||t.brand===bf) &&
+    (!q||t.name.toLowerCase().includes(q))
+  ).sort((a,b)=>{
+    const brandOrder = {altiora:0,pangram:1,petamus:2,공통:3};
+    const bo = (brandOrder[a.brand]??9) - (brandOrder[b.brand]??9);
+    return bo !== 0 ? bo : a.name.localeCompare(b.name,'en');
+  });
+  const tbody = document.getElementById('tbmaster-tbody');
+  if(!list.length){
+    tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state text-muted text-sm">등록된 교재 없음</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map((t,i)=>{
+    const margin = t.costPrice>0 ? Math.round((t.sellPrice-t.costPrice)/t.costPrice*100) : null;
+    const idx = TBM().indexOf(t);
+    return `<tr>
+      <td><span class="brand-badge ${BRANDS[t.brand]?.cls||'badge-gray'}">${BRANDS[t.brand]?.name||t.brand}</span></td>
+      <td style="font-size:13px;">${t.name}</td>
+      <td class="mono text-right">${t.costPrice?won(t.costPrice):'<span class="text-muted">-</span>'}</td>
+      <td class="mono text-right">${won(t.sellPrice)}</td>
+
+      <td><div style="display:flex;gap:4px;">
+        <button class="btn btn-secondary btn-sm" onclick="openTbMasterModal(${idx})">수정</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTbMaster(${idx})">삭제</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function openTbMasterModal(idx=-1){
+  const t = idx>=0 ? TBM()[idx] : null;
+  document.getElementById('modal-tbmaster-title').textContent = t?'교재 수정':'교재 등록';
+  document.getElementById('tbm-name').value = t?.name||'';
+  document.getElementById('tbm-brand').value = t?.brand||'공통';
+  document.getElementById('tbm-publisher').value = t?.publisher||'';
+  document.getElementById('tbm-cost').value = t?.costPrice||0;
+  document.getElementById('tbm-sell').value = t?.sellPrice||0;
+  document.getElementById('tbm-memo').value = t?.memo||'';
+  document.getElementById('modal-tbmaster-save').onclick = ()=>{
+    const name = document.getElementById('tbm-name').value.trim();
+    if(!name){alert('교재명을 입력하세요.');return;}
+    const item = {
+      id: t?.id||'tbm_'+Date.now(),
+      name,
+      brand: document.getElementById('tbm-brand').value,
+      publisher: document.getElementById('tbm-publisher').value,
+      costPrice: parseInt(document.getElementById('tbm-cost').value)||0,
+      sellPrice: parseInt(document.getElementById('tbm-sell').value)||0,
+      memo: document.getElementById('tbm-memo').value,
+    };
+    if(!CY.tbMaster) CY.tbMaster=[];
+    if(idx>=0) CY.tbMaster[idx]=item;
+    else CY.tbMaster.push(item);
+    saveYearData();
+    closeModal('modal-tbmaster');
+    renderTbMaster();
+    toast(t?'교재가 수정되었습니다.':'교재가 등록되었습니다.');
+  };
+  document.getElementById('modal-tbmaster').classList.add('open');
+}
+
+
+
+function deleteTbMaster(idx){
+  showConfirm('이 교재를 삭제하시겠습니까?',()=>{
+    CY.tbMaster.splice(idx,1);
+    saveYearData();
+    renderTbMaster();
+    toast('교재가 삭제되었습니다.');
+  });
+}
+
+function openTbFromMaster(){
+  document.getElementById('tba-brand').value = 'altiora';
+  if(document.getElementById('tba-search')) document.getElementById('tba-search').value='';
+  if(document.getElementById('tba-search-clear')) document.getElementById('tba-search-clear').style.display='none';
+  updateTbaClass();
+  document.getElementById('modal-tb-assign').classList.add('open');
+}
+
+function updateTbaClass(){
+  const brand = document.getElementById('tba-brand')?.value;
+  const sel = document.getElementById('tba-cls');
+  if(!sel) return;
+  sel.innerHTML = (CLASSES[brand]||[]).map(c=>`<option value="${c}">${c}</option>`).join('');
+  renderTbaBookList();
+}
+
+function renderTbaBookList(){
+  const brand = document.getElementById('tba-brand')?.value||'altiora';
+  const q = (document.getElementById('tba-search')?.value||'').toLowerCase();
+  const books = TBM().filter(t=>(t.brand===brand||t.brand==='공통')&&(!q||t.name.toLowerCase().includes(q)))
+    .sort((a,b)=>a.name.localeCompare(b.name,'en'));
+  const el = document.getElementById('tba-book-list');
+  if(!books.length){
+    el.innerHTML=`<div class="text-muted text-sm" style="padding:12px;">${q?'검색 결과 없음':'등록된 교재 없음. 교재 마스터에서 먼저 등록하세요.'}</div>`;
+    document.getElementById('tba-total').textContent='0원';
+    return;
+  }
+  // 기존 체크 상태 보존
+  const checked = new Set(Array.from(document.querySelectorAll('.tba-check:checked')).map(c=>c.dataset.id));
+  el.innerHTML = books.map(t=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <input type="checkbox" class="tba-check" data-sell="${t.sellPrice}" data-id="${t.id}" ${checked.has(t.id)?'checked':''} onchange="calcTbaTotal()" style="width:16px;height:16px;flex-shrink:0;">
+      <span style="flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${t.name}">${t.name}</span>
+      <span class="mono" style="font-size:12px;color:var(--text3);flex-shrink:0;margin-left:8px;">${won(t.sellPrice)}</span>
+    </label>`).join('');
+  calcTbaTotal();
+}
+
+function calcTbaTotal(){
+  const checks = document.querySelectorAll('.tba-check:checked');
+  const total = Array.from(checks).reduce((s,c)=>s+parseInt(c.dataset.sell||0),0);
+  document.getElementById('tba-total').textContent = won(total);
+}
+
+function applyTbAssign(){
+  const brand = document.getElementById('tba-brand').value;
+  const cls = document.getElementById('tba-cls').value;
+  const q = document.getElementById('tba-quarter').value;
+  const checks = document.querySelectorAll('.tba-check:checked');
+  const total = Array.from(checks).reduce((s,c)=>s+parseInt(c.dataset.sell||0),0);
+
+  // 기존 textbooks에서 해당 반 찾아서 업데이트
+  let tb = TB().find(t=>t.brand===brand&&t.cls===cls&&t.type==='전체');
+  if(!tb){
+    tb = {brand,cls,type:'전체',q1:0,q2:0,q3:0,q4:0};
+    CY.textbooks.push(tb);
+  }
+  tb[q] = total;
+  // 선택 교재 목록 저장
+  const selectedBooks = Array.from(checks).map(c=>({id:c.dataset.id, name:TBM().find(t=>t.id===c.dataset.id)?.name||'', price:parseInt(c.dataset.sell||0)}));
+  if(!tb.books) tb.books={};
+  tb.books[q] = selectedBooks;
+  saveYearData();
+  closeModal('modal-tb-assign');
+  renderTextbookTable();
+  toast(`${cls} ${q==='q1'?'1분기':q==='q2'?'2분기':q==='q3'?'3분기':'4분기'} 교재비 ${won(total)} 반영됨`);
+}
+// ── /교재 마스터 ──
+
+function showTbBooks(brand, cls, idx, q){
+  const tb = TB()[idx];
+  if(!tb) return;
+  const books = tb.books?.[q]||[];
+  const qLabel = {q1:'1분기(3~5월)',q2:'2분기(6~8월)',q3:'3분기(9~11월)',q4:'4분기(12~2월)'}[q];
+  const total = tb[q]||0;
+  if(!books.length){
+    alert(`${cls} ${qLabel}
+
+금액: ${won(total)}
+
+(교재 목록 정보 없음 — 직접 입력된 금액)`);
+    return;
+  }
+  const list = books.map(b=>'  · '+b.name+'  '+won(b.price)).join('\n');
+  alert(cls+' '+qLabel+'\n\n'+list+'\n\n합계: '+won(total));
+}
 function renderTextbookTable(){
   const tbody=document.getElementById('textbook-tbody');
   // 브랜드/반 필터 동기화
@@ -2263,8 +2853,7 @@ function renderTextbookTable(){
     return`<tr>
       <td><span class="brand-badge ${BRANDS[tb.brand].cls}">${BRANDS[tb.brand].name}</span></td>
       <td class="text-sm">${tb.cls}</td><td class="text-sm">${tb.type}</td>
-      <td class="mono text-right">${tb.q1?won(tb.q1):'-'}</td><td class="mono text-right">${tb.q2?won(tb.q2):'-'}</td>
-      <td class="mono text-right">${tb.q3?won(tb.q3):'-'}</td><td class="mono text-right">${tb.q4?won(tb.q4):'-'}</td>
+      ${['q1','q2','q3','q4'].map(q=>`<td class="mono text-right">${tb[q]?`<span onclick="showTbBooks('${tb.brand}','${tb.cls}',${TB().indexOf(tb)},'${q}')" style="cursor:pointer;color:var(--accent);text-decoration:underline dotted;" title="클릭하여 교재 목록 보기">${won(tb[q])}</span>`:'-'}</td>`).join('')}
       <td><div style="display:flex;gap:4px;">
         <button class="btn btn-secondary btn-sm" onclick="openTextbookModal(${realIdx})">수정</button>
         <button class="btn btn-danger btn-sm" onclick="deleteTextbook(${realIdx})">삭제</button>
