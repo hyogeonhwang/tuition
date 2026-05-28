@@ -1357,9 +1357,8 @@ async function init(){
   if(!CY.tbMaster||!CY.tbMaster.length){CY.tbMaster=[];loadSampleTbMaster();}
   updateClassOptions();updateTbClass();updateStudentClassFilter();
   renderDashboard();renderStudentTable();renderTextbookTable();renderMasterContent('tuition');renderSpecialList('all');renderArchiveList();
-  // 마지막 페이지 복원 (billing 페이지면 showPage 내에서 restoreLastBilling 호출됨)
-  const lastPage = localStorage.getItem('current_page');
-  if(lastPage && lastPage !== 'dashboard') showPage(lastPage);
+  // 항상 대시보드로 시작
+  showPage('dashboard');
 
 }
 
