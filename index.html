@@ -235,6 +235,9 @@ tr.inactive td{opacity:.38;}
     <div class="nav-item" onclick="showPage('billing')"><span class="nav-icon">🧾</span>월별 청구 생성</div>
     <div class="nav-item" onclick="showPage('students')"><span class="nav-icon">👦</span>원생 관리</div>
     <div class="nav-item" onclick="showPage('special')"><span class="nav-icon">⚠️</span>특이사항 체크</div>
+    <div class="nav-section">보고</div>
+    <div class="nav-item" onclick="showPage('monthly')"><span class="nav-icon">📋</span>월말 보고</div>
+    <div class="nav-item" onclick="showPage('consult')"><span class="nav-icon">📞</span>주간 상담 일지</div>
     <div class="nav-section">설정</div>
     <div class="nav-item" onclick="showPage('master')"><span class="nav-icon">⚙️</span>단가 설정</div>
     <div class="nav-item" onclick="showPage('textbook')"><span class="nav-icon">📚</span>외부교재비 설정</div>
@@ -327,17 +330,18 @@ tr.inactive td{opacity:.38;}
             <option value="pangram">팬그램</option>
             <option value="petamus">페타무스</option>
           </select>
-          <select id="bf-class" onchange="renderBillingTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
+          <select id="bf-class" style="font-size:12px;padding:5px 8px;max-width:150px;">
             <option value="">전체 반</option>
           </select>
           <div style="position:relative;">
-            <input type="text" id="bf-search" placeholder="🔍 이름 검색..." oninput="renderBillingTable();document.getElementById('bf-search-clear').style.display=this.value?'flex':'none';"
+            <input type="text" id="bf-search" placeholder="🔍 이름 검색..." onkeydown="if(event.key==='Enter')renderBillingTable()" oninput="document.getElementById('bf-search-clear').style.display=this.value?'flex':'none';"
               style="font-size:12px;padding:5px 26px 5px 10px;border:1px solid var(--border);border-radius:6px;width:130px;background:var(--surface);">
             <span id="bf-search-clear" onclick="document.getElementById('bf-search').value='';renderBillingTable();this.style.display='none';"
               style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;align-items:center;">✕</span>
           </div>
           <input type="hidden" id="bf-item" value="">
           <button id="bf-clear-all" onclick="clearAllBillingFilters()" style="display:none;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--warn-bg,#fef3dc);cursor:pointer;color:var(--text2);">✕ 필터 초기화</button>
+          <button class="btn btn-primary btn-sm" onclick="renderBillingTable()" style="white-space:nowrap;">🔍 조회</button>
         </div>
         <div class="table-wrap" style="max-height:60vh;overflow-y:auto;"><table><thead id="billing-thead" style="position:sticky;top:0;z-index:10;"></thead><tbody id="billing-tbody"></tbody></table></div>
         <div id="billing-class-summary" style="margin-top:0;"></div>
@@ -362,15 +366,15 @@ tr.inactive td{opacity:.38;}
       <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:13px;">
         <div style="position:relative;flex:1;min-width:180px;max-width:240px;">
           <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);">🔍</span>
-          <input type="text" id="student-search" placeholder="이름, 영어명..." oninput="renderStudentTable();toggleSearchClear()" style="padding-left:28px;padding-right:26px;">
+          <input type="text" id="student-search" placeholder="이름, 영어명..." onkeydown="if(event.key==='Enter')renderStudentTable()" oninput="toggleSearchClear()" style="padding-left:28px;padding-right:26px;">
           <span id="search-clear" onclick="clearStudentSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;line-height:1;">✕</span>
         </div>
-        <select id="sf-brand" onchange="updateStudentClassFilter();renderStudentTable();" style="font-size:12px;padding:6px 9px;max-width:115px;">
+        <select id="sf-brand" onchange="updateStudentClassFilter();" style="font-size:12px;padding:6px 9px;max-width:115px;">
           <option value="">전체 브랜드</option><option value="altiora">알티오라</option><option value="pangram">팬그램</option><option value="petamus">페타무스</option>
         </select>
-        <select id="sf-class" onchange="renderStudentTable()" style="font-size:12px;padding:6px 9px;max-width:155px;"><option value="">전체 반</option></select>
-        <select id="sf-status" onchange="renderStudentTable()" style="font-size:12px;padding:6px 9px;max-width:115px;"><option value="active">활성만</option><option value="all">전체</option></select>
-        <select id="sf-special" onchange="renderStudentTable()" style="font-size:12px;padding:6px 9px;max-width:140px;">
+        <select id="sf-class" style="font-size:12px;padding:6px 9px;max-width:155px;"><option value="">전체 반</option></select>
+        <select id="sf-status" style="font-size:12px;padding:6px 9px;max-width:115px;"><option value="all">전체</option><option value="active" selected>활성만</option><option value="inactive">퇴원생만</option></select>
+        <select id="sf-special" style="font-size:12px;padding:6px 9px;max-width:140px;">
           <option value="">전체 조건</option>
           <option value="sibling">형제 할인</option>
           <option value="shuttle_none">셔틀 개별</option>
@@ -378,6 +382,7 @@ tr.inactive td{opacity:.38;}
           <option value="care">돌봄 있음</option>
           <option value="onetone">1:1 수업</option>
         </select>
+        <button class="btn btn-primary" onclick="renderStudentTable()" style="white-space:nowrap;">🔍 조회</button>
         <div class="ml-auto" style="display:flex;gap:8px;">
           <button class="btn btn-secondary" onclick="downloadStudentTemplate()">📋 서식 다운로드</button>
           <button class="btn btn-secondary" onclick="document.getElementById('upload-excel').click()">📤 엑셀 업로드</button>
@@ -438,15 +443,16 @@ tr.inactive td{opacity:.38;}
           <div class="card-header">
             <div class="card-title">반별 교재비 설정</div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <select id="tb-filter-brand" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:110px;">
+              <select id="tb-filter-brand" style="font-size:12px;padding:5px 8px;max-width:110px;">
                 <option value="">전체 브랜드</option>
                 <option value="altiora">알티오라</option>
                 <option value="pangram">팬그램</option>
                 <option value="petamus">페타무스</option>
               </select>
-              <select id="tb-filter-cls" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
+              <select id="tb-filter-cls" style="font-size:12px;padding:5px 8px;max-width:150px;">
                 <option value="">전체 반</option>
               </select>
+              <button class="btn btn-primary btn-sm" onclick="renderTextbookTable()" style="white-space:nowrap;">🔍 조회</button>
               <button class="btn btn-primary btn-sm" onclick="openTextbookModal()">+ 추가</button>
               <button class="btn btn-secondary btn-sm" onclick="openTbFromMaster()">📚 교재 마스터에서 배정</button>
             </div>
@@ -466,15 +472,16 @@ tr.inactive td{opacity:.38;}
           <div class="card-header">
             <div class="card-title">교재 마스터</div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <input type="text" id="tbm-search" placeholder="교재명 검색..." oninput="renderTbMaster()"
+              <input type="text" id="tbm-search" placeholder="교재명 검색..." onkeydown="if(event.key==='Enter')renderTbMaster()"
                 style="font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;width:160px;">
-              <select id="tbm-filter-brand" onchange="renderTbMaster()" style="font-size:12px;padding:5px 8px;">
+              <select id="tbm-filter-brand" style="font-size:12px;padding:5px 8px;">
                 <option value="">전체 브랜드</option>
                 <option value="altiora">알티오라</option>
                 <option value="pangram">팬그램</option>
                 <option value="petamus">페타무스</option>
                 <option value="공통">공통</option>
               </select>
+              <button class="btn btn-primary btn-sm" onclick="renderTbMaster()" style="white-space:nowrap;">🔍 조회</button>
               <button class="btn btn-primary btn-sm" onclick="openTbMasterModal()">+ 교재 등록</button>
             </div>
           </div>
@@ -520,6 +527,163 @@ tr.inactive td{opacity:.38;}
           </div>
         </div>
       </div>
+    </div>
+
+
+    <!-- CONSULT PAGE -->
+    <div class="page" id="page-consult">
+      <!-- 상단 주차 선택 + 입력 버튼 -->
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="moveConsultWeek(-1)">◀ 이전 주</button>
+          <span id="consult-week-label" style="font-size:14px;font-weight:600;color:var(--text);min-width:220px;text-align:center;"></span>
+          <button class="btn btn-secondary" onclick="moveConsultWeek(1)">다음 주 ▶</button>
+          <button class="btn btn-primary" onclick="setThisWeek()">이번 주</button>
+          <div style="position:relative;margin-left:8px;">
+            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;">🔍</span>
+            <input type="text" id="consult-search" placeholder="이름 검색..."
+              style="padding:6px 24px 6px 28px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:140px;background:var(--surface);"
+              oninput="renderConsultFilter();document.getElementById('consult-search-clear').style.display=this.value?'flex':'none';"
+              onkeydown="if(event.key==='Escape'){this.value='';renderConsultFilter();document.getElementById('consult-search-clear').style.display='none';}">
+            <span id="consult-search-clear" onclick="document.getElementById('consult-search').value='';renderConsultFilter();this.style.display='none';"
+              style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;line-height:1;align-items:center;">✕</span>
+          </div>
+          <button class="btn btn-primary" onclick="openConsultModal()" style="background:var(--green);border-color:var(--green);margin-left:8px;">+ 상담 입력</button>
+        </div>
+      </div>
+
+      <!-- 주간 요약 -->
+      <div id="consult-summary" style="margin-bottom:14px;"></div>
+
+      <!-- 상담 목록 테이블 -->
+      <div class="card" style="padding:0;">
+        <div class="table-wrap" style="max-height:55vh;overflow-y:auto;">
+          <table>
+            <thead><tr>
+              <th style="min-width:70px;">날짜</th>
+              <th>Contact</th>
+              <th>알게된 경로</th>
+              <th>수신인</th>
+              <th>구분</th>
+              <th>원아명</th>
+              <th style="min-width:40px;">나이</th>
+              <th style="min-width:30px;">성별</th>
+              <th style="min-width:110px;">연락처</th>
+              <th style="min-width:200px;">상담내용</th>
+              <th style="min-width:90px;">대면상담일</th>
+              <th style="min-width:90px;">테스트일정</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="consult-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 상담 입력 모달 -->
+    <div class="modal-overlay" id="modal-consult" style="display:none;opacity:1;pointer-events:auto;">
+      <div class="modal" style="max-width:560px;">
+        <div class="modal-header" id="consult-modal-header" style="cursor:move;user-select:none;">
+          <div class="modal-title" id="consult-modal-title">상담 입력</div>
+          <button class="modal-close" onclick="document.getElementById('modal-consult').style.display='none'">✕</button>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>날짜 *</label>
+            <input type="text" id="c-date" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)" onblur="validateDateField(this)" style="max-width:160px;">
+          </div>
+          <div class="form-group"><label>수신인</label>
+            <input type="text" id="c-receiver" placeholder="직접 입력" style="max-width:120px;">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Contact 경로</label>
+            <select id="c-contact">
+              <option value="전화">전화</option>
+              <option value="오픈채팅">오픈채팅</option>
+              <option value="네이버톡톡">네이버톡톡</option>
+              <option value="walk-in">walk-in</option>
+              <option value="문자">문자</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="form-group"><label>알게된 경로</label>
+            <select id="c-source">
+              <option value="블로그">블로그</option>
+              <option value="인스타그램">인스타그램</option>
+              <option value="지인·단톡">지인·단톡</option>
+              <option value="카페·검색">카페·검색</option>
+              <option value="버스·지나가다">버스·지나가다</option>
+              <option value="셔틀버스">셔틀버스</option>
+              <option value="네이버검색">네이버검색</option>
+              <option value="미확인">미확인</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>구분</label>
+            <select id="c-brand">
+              <option value="알티오라">알티오라</option>
+              <option value="팬그램">팬그램</option>
+              <option value="페타무스">페타무스</option>
+              <option value="캠프">캠프</option>
+            </select>
+          </div>
+          <div class="form-group"><label>원아명</label>
+            <input type="text" id="c-name" placeholder="원아명">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>나이</label>
+            <input type="number" id="c-age" placeholder="만 나이" style="max-width:80px;" min="1" max="15">
+          </div>
+          <div class="form-group"><label>성별</label>
+            <select id="c-gender">
+              <option value="여">여</option>
+              <option value="남">남</option>
+            </select>
+          </div>
+          <div class="form-group"><label>연락처</label>
+            <input type="text" id="c-phone" placeholder="010-0000-0000">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group full"><label>상담 내용</label>
+            <textarea id="c-content" placeholder="상담 내용 입력..." style="height:80px;" lang="ko" inputmode="text"></textarea>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>대면상담일</label>
+            <input type="text" id="c-meetdate" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)">
+          </div>
+          <div class="form-group"><label>테스트일정</label>
+            <input type="text" id="c-testdate" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="document.getElementById('modal-consult').style.display='none'">취소</button>
+          <button class="btn btn-danger btn-sm" id="c-delete-btn" style="display:none;margin-right:auto;" onclick="deleteConsult()">삭제</button>
+          <button class="btn btn-primary" onclick="saveConsult()">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONTHLY REPORT -->
+    <div class="page" id="page-monthly">
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <select id="monthly-year" style="width:100px;"></select>
+          <select id="monthly-month" style="width:80px;">
+            <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+            <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+            <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+            <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+          </select>
+          <button class="btn btn-primary" onclick="renderMonthlyReport()">🔍 조회</button>
+          <span id="monthly-summary-badge" style="font-size:13px;color:var(--text2);"></span>
+        </div>
+      </div>
+      <div id="monthly-report-content"></div>
     </div>
 
     <div class="page" id="page-yearend">
@@ -652,9 +816,17 @@ tr.inactive td{opacity:.38;}
     </div>
     <div class="form-row"><div class="form-group full"><label>메모</label><textarea id="s-memo" placeholder="셔틀 특이사항, 결제 방법, 기타..."></textarea></div></div>
     <div class="form-row">
+      <div class="form-group"><label>입학일</label>
+        <input type="text" id="s-join-date" style="max-width:180px;" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)" onblur="validateDateField(this)">
+      </div>
       <div class="form-group"><label>퇴원 예정일</label>
-        <input type="date" id="s-leave-month" style="max-width:180px;">
+        <input type="text" id="s-leave-month" style="max-width:180px;" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)" onblur="validateDateField(this)">
         <div class="text-xs text-muted">입력 시 해당 날짜 이후 인원에서 제외</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group full"><label>퇴원 사유</label>
+        <input type="text" id="s-leave-reason" placeholder="퇴원 사유 입력 (퇴원 시에만)">
       </div>
     </div>
     <div class="modal-footer">
@@ -1378,7 +1550,7 @@ const PAGE_TITLES={
   dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
   special:'특이사항 체크', master:'단가 설정', textbook:'외부교재비 설정',
   yearend:'학년도 관리',
-  calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리'
+  calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'월말 보고', consult:'주간 상담 일지'
 };
 function showPage(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
@@ -1394,6 +1566,8 @@ function showPage(p){
   if(p==='yearend')renderArchiveList();
   if(p==='sms'){ initSmsPage(); renderSmsTemplateList(); }
   if(p==='classconfig') renderClassConfig();
+  if(p==='monthly'){ initMonthlySelectors(); renderMonthlyReport(); }
+  if(p==='consult') initConsultPage();
   if(p==='billing'){
     // 이미 생성된 청구서가 없을 때만 복원
     if(currentBilling.length === 0) restoreLastBilling();
@@ -1472,6 +1646,45 @@ function renderDashboard(viewMonth){
     items: alertList,
     empty: '이달 특이 알림 없음'
   });
+
+  // 상담 테스트 일정 알림 — 내일 테스트인 건 조회
+  (function loadTestAlerts(){
+    const today = new Date();
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+    const tStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,'0')}-${String(tomorrow.getDate()).padStart(2,'0')}`;
+    firebase.database().ref('consult')
+      .orderByChild('testdate').equalTo(tStr)
+      .once('value', snap=>{
+        const testItems = [];
+        snap.forEach(c=>{
+          const r = c.val();
+          testItems.push({ text:`📝 [테스트] ${r.name||'(이름없음)'} — ${r.brand||''} ${r.phone?'('+r.phone+')':''}`, sid:null });
+        });
+        if(!testItems.length) return;
+        // 대시보드 알림 섹션에 동적으로 추가 (중복 방지)
+        const accEl = document.getElementById('accordion-list');
+        if(!accEl) return;
+        // 기존 테스트 알림 제거
+        const existing = document.getElementById('test-alert-section');
+        if(existing) existing.remove();
+        const badge = `<span class="tag" style="background:#e74c3c22;color:#e74c3c;font-size:11px;">${testItems.length}건</span>`;
+        const items = testItems.map(t=>`<div style="padding:5px 0;font-size:13px;border-bottom:1px solid var(--border);">${t.text}</div>`).join('');
+        const html = `
+          <div id="test-alert-section" style="border:1px solid #e74c3c55;border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#e74c3c11;cursor:pointer;user-select:none;"
+              onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+              <span style="font-size:15px;">📋</span>
+              <span style="font-size:13px;font-weight:600;flex:1;color:#e74c3c;">내일 테스트 일정</span>
+              ${badge}
+              <span style="font-size:12px;color:var(--text3);">▼</span>
+            </div>
+            <div style="padding:10px 14px;border-top:1px solid #e74c3c33;">
+              ${items}
+            </div>
+          </div>`;
+        accEl.insertAdjacentHTML('afterbegin', html);
+      });
+  })();
 
   // 아코디언 렌더
   const accEl = document.getElementById('accordion-list');
@@ -1881,6 +2094,8 @@ function clearAllBillingFilters(){
 // ── /청구서 컬럼 필터 ──
 
 function renderBillingTable(){
+  // 청구 데이터 없으면 자동 생성 후 렌더
+  if(!currentBilling.length){ generateBilling(true); return; }
   const month=currentBillingMonth;
   const isQ=isQM(month),isS=isSM(month);
   const bq=(document.getElementById('bf-search')?.value||'').toLowerCase();
@@ -2086,6 +2301,7 @@ function renderStudentTable(){
   const spf=document.getElementById('sf-special')?.value||'';
   const list=S().filter(s=>{
     if(sf==='active'&&!s.active)return false;
+    if(sf==='inactive'&&s.active)return false;
     if(bf&&s.brand!==bf)return false;
     if(cf&&s.cls!==cf)return false;
     if(q&&!s.name.includes(q)&&!s.ename.toLowerCase().includes(q))return false;
@@ -2177,10 +2393,17 @@ function buildStudentRow(s){
     <td class="text-sm">${s.paytype==='월납'?'<span class="text-muted">월납</span>':`<span class="tag tag-blue" style="font-size:10px;">${s.paytype}</span>`}${s.split?' <span class="tag tag-blue" style="font-size:10px;">분할</span>':''}</td>
     <td>${careOt||''}</td>
     <td>${flags.join(' ')}${s.memo?`<span onclick="showMemoPopup('${s.id}','${(s.memo||'').replace(/'/g,'&#39;')}')" style="font-size:13px;cursor:pointer;" title="${s.memo}">📝</span>`:''}${s.sms!=='어머니'?`<span class="tag tag-gray" style="font-size:10px;">📱${s.sms}</span>`:''}</td>
-    <td>${s.active?'<span class="tag tag-green" style="font-size:10px;">활성</span>':'<span class="tag tag-gray" style="font-size:10px;">퇴원</span>'}</td>
+    <td>${s.active
+      ? '<span class="tag tag-green" style="font-size:10px;">활성</span>'
+      : `<span class="tag tag-gray" style="font-size:10px;">퇴원</span>
+         ${s.leaveMonth?`<div style="font-size:10px;color:var(--text3);margin-top:2px;">${s.leaveMonth.replace(/-/g,'.')}</div>`:''}
+         ${s.leaveReason?`<div style="font-size:11px;color:var(--text2);margin-top:2px;max-width:160px;">${s.leaveReason}</div>`:''}`
+    }</td>
     <td><div style="display:flex;gap:4px;">
       <button class="btn btn-secondary btn-sm" onclick="openStudentModal(${idx})">수정</button>
-      ${s.active?`<button class="btn btn-danger btn-sm" onclick="toggleActive(${idx})">퇴원</button>`:`<button class="btn btn-success btn-sm" onclick="toggleActive(${idx})">복구</button>`}
+      ${s.active
+        ? `<button class="btn btn-danger btn-sm" onclick="openStudentModal(${idx})" title="모달에서 퇴원일 입력">퇴원</button>`
+        : `<button class="btn btn-success btn-sm" onclick="openAndClearLeave(${idx})" title="퇴원일 삭제 후 복구">복구</button>`}
     </div></td>`;
   return tr;
 }
@@ -2373,6 +2596,8 @@ function openStudentModal(idx=-1){
     document.getElementById('s-sibling-clear').style.display = 'none';
   }
   v('s-leave-month',s?.leaveMonth||'');
+  v('s-join-date',s?.joinDate||'');
+  v('s-leave-reason',s?.leaveReason||'');
   // htime 최종 복원 (두번째 updateBrandFields 대신)
   if(s?.htime){
     const htimeFinal = document.getElementById('s-htime');
@@ -2398,17 +2623,34 @@ function saveStudent(){
     customTuition:0,
     otPayType:'',
     receipt:document.getElementById('s-receipt').value,sms:document.getElementById('s-sms').value,
-    split:document.getElementById('s-split').checked,noFee:document.getElementById('s-no-fee').checked,memo:document.getElementById('s-memo').value.trim(),leaveMonth:document.getElementById('s-leave-month')?.value||'',
-    active:editSIdx>=0?S()[editSIdx].active:true
+    split:document.getElementById('s-split').checked,noFee:document.getElementById('s-no-fee').checked,memo:document.getElementById('s-memo').value.trim(),
+    leaveMonth:document.getElementById('s-leave-month')?.value||'',
+    joinDate:document.getElementById('s-join-date')?.value||'',
+    leaveReason:document.getElementById('s-leave-month')?.value
+      ? (document.getElementById('s-leave-reason')?.value.trim()||'')
+      : '',
+    // 퇴원일 있으면 active=false, 없으면 active=true (자동 퇴원/복구)
+    active: !(document.getElementById('s-leave-month')?.value)
   };
   if(editSIdx>=0)CY.students[editSIdx]=s;else CY.students.push(s);
   saveYearData();closeModal('modal-student');renderStudentTable();renderDashboard();renderSpecialList('all');
   toast(editSIdx>=0?`${s.name} 원생 정보가 수정되었습니다.`:`${s.name} 원생이 추가되었습니다.`);
 }
 function toggleActive(idx){
-  const s=S()[idx];
-  showConfirm(`${s.name} 원생을 ${s.active?'퇴원':'복구'} 처리하시겠습니까?`,()=>{
-    const wasActive=CY.students[idx].active; CY.students[idx].active=!wasActive;saveYearData();renderStudentTable();renderDashboard(); toast(CY.students[idx].name+(CY.students[idx].active?' 원생 복구':'  퇴원 처리')+'되었습니다.', CY.students[idx].active?'success':'warn');
+  // 레거시 — 더 이상 직접 호출 안 됨. openAndClearLeave로 대체.
+  openAndClearLeave(idx);
+}
+function openAndClearLeave(idx){
+  const s = S()[idx];
+  showConfirm(`${s.name} 원생을 복구하시겠습니까?
+퇴원일과 퇴원사유가 초기화됩니다.`, ()=>{
+    CY.students[idx].active = true;
+    CY.students[idx].leaveMonth = '';
+    CY.students[idx].leaveReason = '';
+    saveYearData();
+    renderStudentTable();
+    renderDashboard();
+    toast(`${s.name} 원생이 복구되었습니다.`, 'success');
   });
 }
 
@@ -3737,6 +3979,485 @@ function addFeeItem(brand, type){
   };
   document.getElementById('modal-master').classList.add('open');
 }
+
+
+// ══════════════════════════════════════════════
+// MONTHLY REPORT — 월말 보고
+// ══════════════════════════════════════════════
+function initMonthlySelectors(){
+  const ySel = document.getElementById('monthly-year');
+  if(!ySel || ySel.options.length > 0) return;
+  for(let y=2024;y<=2028;y++){
+    const o=document.createElement('option');
+    o.value=y; o.textContent=y+'년';
+    if(y===CY.year) o.selected=true;
+    ySel.appendChild(o);
+  }
+  const now = new Date();
+  document.getElementById('monthly-month').value = now.getMonth()+1;
+}
+
+function renderMonthlyReport(){
+  initMonthlySelectors();
+  const yVal = document.getElementById('monthly-year')?.value;
+  const mVal = document.getElementById('monthly-month')?.value;
+  const year  = (yVal && parseInt(yVal)>0) ? parseInt(yVal) : (CY.year||new Date().getFullYear());
+  const month = (mVal && parseInt(mVal)>0) ? parseInt(mVal) : new Date().getMonth()+1;
+  const all   = S();
+
+  // 날짜 비교를 문자열(YYYY-MM-DD)로 처리 — UTC 파싱 오류 방지
+  const pad = n => String(n).padStart(2,'0');
+  const lastDay = new Date(year, month, 0).getDate();
+  const mStartStr = `${year}-${pad(month)}-01`;
+  const mEndStr   = `${year}-${pad(month)}-${pad(lastDay)}`;
+  const inMonth = d => d && d >= mStartStr && d <= mEndStr;
+
+  // 신규생: joinDate가 해당 월인 원생
+  const newStudents = all.filter(s=> inMonth(s.joinDate))
+    .sort((a,b)=> a.joinDate > b.joinDate ? 1 : -1);
+
+  // 퇴원생: leaveMonth가 해당 월인 원생
+  const leftStudents = all.filter(s=> inMonth(s.leaveMonth))
+    .sort((a,b)=> a.leaveMonth > b.leaveMonth ? 1 : -1);
+
+  // 재원 현황: 해당 월에 재원 중인 원생 (입학일 이전 제외, 퇴원일 이전 월 제외)
+  const activeAll = all.filter(s=>{
+    if(s.joinDate && s.joinDate > mEndStr) return false;   // 아직 입학 안 함
+    if(s.leaveMonth && s.leaveMonth < mStartStr) return false; // 이미 퇴원
+    return true;
+  });
+  const byBrand = {altiora:0,pangram:0,petamus:0};
+  activeAll.forEach(s=>{ if(byBrand[s.brand]!==undefined) byBrand[s.brand]++; });
+
+  // 뱃지
+  const badge = document.getElementById('monthly-summary-badge');
+  if(badge) badge.textContent = `신규 ${newStudents.length}명 · 퇴원 ${leftStudents.length}명`;
+
+  const fmt = d => d ? d.replace(/-/g,'. ') : '-';
+  const brandBadge = s => `<span class="brand-badge ${BRANDS[s.brand]?.cls||''}" style="font-size:10px;">${BRANDS[s.brand]?.name||s.brand}</span>`;
+
+  // 신규생 테이블
+  const newHTML = newStudents.length ? `
+    <table>
+      <thead><tr>
+        <th>#</th><th>입학일</th><th>브랜드</th><th>반</th><th>이름</th><th>비고</th>
+      </tr></thead>
+      <tbody>
+        ${newStudents.map((s,i)=>`
+          <tr>
+            <td class="text-muted">${i+1}</td>
+            <td>${fmt(s.joinDate)}</td>
+            <td>${brandBadge(s)}</td>
+            <td style="font-size:12px;color:var(--text2);">${s.cls}</td>
+            <td><span onclick="openStudentModal(S().findIndex(x=>x.id==='${s.id}'))"
+              style="cursor:pointer;color:var(--accent2);font-weight:600;">${s.name}</span>
+              <span style="color:var(--text3);font-size:11px;margin-left:4px;">${s.ename||''}</span>
+            </td>
+            <td style="font-size:12px;color:var(--text2);">${s.memo||''}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>` : `<div class="text-muted text-sm" style="padding:12px 0;">신규 입학생 없음</div>`;
+
+  // 퇴원생 테이블
+  const leftHTML = leftStudents.length ? `
+    <table>
+      <thead><tr>
+        <th>#</th><th>퇴원일</th><th>브랜드</th><th>반</th><th>이름</th><th>퇴원 사유</th>
+      </tr></thead>
+      <tbody>
+        ${leftStudents.map((s,i)=>{
+          const join = s.joinDate ? fmt(s.joinDate) : '-';
+          const leave = fmt(s.leaveMonth);
+          const period = (s.joinDate && s.leaveMonth)
+            ? `${fmt(s.joinDate)} ~ ${fmt(s.leaveMonth)}`
+            : leave;
+          return `
+          <tr>
+            <td class="text-muted">${i+1}</td>
+            <td>${leave}</td>
+            <td>${brandBadge(s)}</td>
+            <td style="font-size:12px;color:var(--text2);">${s.cls}</td>
+            <td><span onclick="openStudentModal(S().findIndex(x=>x.id==='${s.id}'))"
+              style="cursor:pointer;color:var(--accent2);font-weight:600;">${s.name}</span>
+              <span style="color:var(--text3);font-size:11px;margin-left:4px;">${s.ename||''}</span>
+            </td>
+              <td style="font-size:12px;color:var(--text2);">${s.leaveReason||''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>` : `<div class="text-muted text-sm" style="padding:12px 0;">퇴원생 없음</div>`;
+
+  // 재원 현황 카드
+  const summaryHTML = `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px;">
+      <div class="card" style="flex:1;min-width:120px;padding:12px 16px;">
+        <div class="text-xs text-muted">전체</div>
+        <div style="font-size:22px;font-weight:700;color:var(--accent2);">${activeAll.length}명</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;padding:12px 16px;">
+        <div class="text-xs text-muted">알티오라</div>
+        <div style="font-size:22px;font-weight:700;color:var(--altiora);">${byBrand.altiora}명</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;padding:12px 16px;">
+        <div class="text-xs text-muted">팬그램</div>
+        <div style="font-size:22px;font-weight:700;color:var(--accent);">${byBrand.pangram}명</div>
+      </div>
+      <div class="card" style="flex:1;min-width:120px;padding:12px 16px;">
+        <div class="text-xs text-muted">페타무스</div>
+        <div style="font-size:22px;font-weight:700;color:var(--green);">${byBrand.petamus}명</div>
+      </div>
+    </div>`;
+
+  document.getElementById('monthly-report-content').innerHTML = `
+    ${summaryHTML}
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">
+        🆕 ${month}월 신규생 <span style="color:var(--accent2);margin-left:6px;">${newStudents.length}명</span>
+      </div>
+      ${newHTML}
+    </div>
+    <div class="card">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">
+        👋 ${month}월 퇴원생 <span style="color:var(--red);margin-left:6px;">${leftStudents.length}명</span>
+      </div>
+      ${leftHTML}
+    </div>`;
+}
+
+
+// ══════════════════════════════════════════════
+// CONSULT — 주간 상담 일지
+// ══════════════════════════════════════════════
+let consultEditId = null;
+let consultRows = []; // 현재 조회된 전체 행 (검색 필터링용)
+
+function getWeekRange(weekVal){
+  // weekVal: "2026-W22" 형태
+  if(!weekVal) return null;
+  const [yr, wk] = weekVal.split('-W');
+  const y = parseInt(yr), w = parseInt(wk);
+  // ISO week의 월요일 계산
+  const jan4 = new Date(y, 0, 4);
+  const startOfW1 = new Date(jan4);
+  startOfW1.setDate(jan4.getDate() - (jan4.getDay()||7) + 1);
+  const mon = new Date(startOfW1);
+  mon.setDate(startOfW1.getDate() + (w-1)*7);
+  const fri = new Date(mon);
+  fri.setDate(mon.getDate() + 4);
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return { monStr: fmt(mon), friStr: fmt(fri), mon, fri };
+}
+
+function getCurrentWeek(){
+  const now = new Date();
+  const y = now.getFullYear();
+  const jan4 = new Date(y, 0, 4);
+  const startW1 = new Date(jan4);
+  startW1.setDate(jan4.getDate() - (jan4.getDay()||7) + 1);
+  const week = Math.ceil(((now - startW1) / 86400000 + 1) / 7);
+  return `${y}-W${String(week).padStart(2,'0')}`;
+}
+
+// 현재 조회 중인 주의 월요일 (Date 객체)
+let consultMonday = null;
+
+function getMonday(d){
+  const day = d.getDay()||7;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - day + 1);
+  mon.setHours(0,0,0,0);
+  return mon;
+}
+
+function fmtDate(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function setThisWeek(){
+  consultMonday = getMonday(new Date());
+  renderConsultPage();
+}
+
+function moveConsultWeek(delta){
+  if(!consultMonday) consultMonday = getMonday(new Date());
+  consultMonday.setDate(consultMonday.getDate() + delta * 7);
+  renderConsultPage();
+}
+
+function initConsultPage(){
+  if(!consultMonday) consultMonday = getMonday(new Date());
+  renderConsultPage();
+}
+
+function renderConsultPage(){
+  if(!consultMonday) consultMonday = getMonday(new Date());
+  const mon = new Date(consultMonday);
+  const fri = new Date(mon); fri.setDate(mon.getDate() + 4);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const monStr = fmtDate(mon);
+  const sunStr = fmtDate(sun); // 일요일까지 포함 (주말 입력 대비)
+  const friStr = fmtDate(fri);
+
+  const dayKo = ['일','월','화','수','목','금','토'];
+  const lbl = `${mon.getMonth()+1}/${mon.getDate()}(${dayKo[mon.getDay()]}) ~ ${fri.getMonth()+1}/${fri.getDate()}(${dayKo[fri.getDay()]})`;
+  const labelEl = document.getElementById('consult-week-label');
+  if(labelEl) labelEl.textContent = lbl;
+
+  // Firebase에서 해당 주 데이터 조회 (월~일)
+  firebase.database().ref('consult')
+    .orderByChild('date').startAt(monStr).endAt(sunStr+'￿')
+    .once('value', snap=>{
+      const rows = [];
+      snap.forEach(c=>{ rows.push({id:c.key, ...c.val()}); });
+      rows.sort((a,b)=> a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+      consultRows = rows;
+      renderConsultFilter(); // 검색어 적용 후 렌더
+      renderConsultSummary(rows, lbl); // 요약은 전체 기준
+    });
+}
+
+function renderConsultFilter(){
+  const q = (document.getElementById('consult-search')?.value||'').trim();
+  const filtered = q
+    ? consultRows.filter(r=>(r.name||'').includes(q)||(r.phone||'').includes(q))
+    : consultRows;
+  renderConsultTable(filtered);
+}
+
+function renderConsultTable(rows){
+  const tbody = document.getElementById('consult-tbody');
+  if(!rows.length){
+    tbody.innerHTML = '<tr><td colspan="13"><div class="empty-state text-muted text-sm">이번 주 상담 내역 없음</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((r,i)=>`
+    <tr>
+      <td style="font-size:12px;white-space:nowrap;">${r.date?.replace(/-/g,'.')}</td>
+      <td style="font-size:12px;white-space:nowrap;">${r.contact||''}</td>
+      <td style="font-size:12px;white-space:nowrap;">${r.source||''}</td>
+      <td style="font-size:12px;">${r.receiver||''}</td>
+      <td><span class="brand-badge ${r.brand==='알티오라'?'altiora-badge':r.brand==='팬그램'?'pangram-badge':r.brand==='페타무스'?'petamus-badge':''}"
+        style="font-size:10px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);">${r.brand||''}</span></td>
+      <td style="font-weight:600;">${r.name||''}</td>
+      <td style="font-size:12px;text-align:center;">${r.age||''}</td>
+      <td style="font-size:12px;text-align:center;">${r.gender||''}</td>
+      <td style="font-size:12px;">${r.phone||''}</td>
+      <td style="font-size:12px;max-width:220px;white-space:pre-wrap;word-break:break-all;">${r.content||''}</td>
+      <td style="font-size:12px;white-space:nowrap;">${r.meetdate?.replace(/-/g,'.')||''}</td>
+      <td style="font-size:12px;white-space:nowrap;">${r.testdate?.replace(/-/g,'.')||''}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="openConsultModal('${r.id}')">수정</button></td>
+    </tr>`).join('');
+}
+
+function renderConsultSummary(rows, lbl){
+  const total = rows.length;
+  const count = arr => arr.reduce((a,v)=>{ a[v]=(a[v]||0)+1; return a; },{});
+
+  const contactCounts = count(rows.map(r=>r.contact||'기타'));
+  const sourceCounts  = count(rows.map(r=>r.source||'미확인'));
+  const brandCounts   = count(rows.map(r=>r.brand||'기타'));
+  const meetCount     = rows.filter(r=>r.meetdate).length;
+
+  const contactOrder = ['전화','오픈채팅','네이버톡톡','walk-in','문자','기타'];
+  const sourceOrder  = ['블로그','인스타그램','지인·단톡','카페·검색','버스·지나가다','셔틀버스','네이버검색','미확인','기타'];
+
+  const listHTML = (order, counts) => order
+    .filter(k=> counts[k])
+    .map(k=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;">
+      <span style="color:var(--text2);">${k}</span>
+      <span style="font-weight:700;color:var(--accent2);">${counts[k]}건</span>
+    </div>`).join('');
+
+  const brandHTML = Object.entries(brandCounts)
+    .map(([k,v])=>`<span class="tag tag-blue" style="font-size:12px;">${k} ${v}건</span>`).join(' ');
+
+  document.getElementById('consult-summary').innerHTML = `
+    <div class="card" style="border-left:4px solid var(--accent2);">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">
+        📊 ${lbl} 주간 보고 <span style="color:var(--accent2);margin-left:8px;">총 ${total}건</span>
+        ${meetCount?`<span style="color:var(--green);font-size:12px;margin-left:8px;">대면상담 ${meetCount}건 예정</span>`:''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px;">1. Contact 경로</div>
+          ${listHTML(contactOrder, contactCounts)||'<div class="text-muted text-sm">없음</div>'}
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px;">2. 알게된 경로</div>
+          ${listHTML(sourceOrder, sourceCounts)||'<div class="text-muted text-sm">없음</div>'}
+        </div>
+      </div>
+      ${brandHTML?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px;">3. 구분</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">${brandHTML}</div>
+      </div>`:''}
+    </div>`;
+}
+
+function openConsultModal(id){
+  consultEditId = id || null;
+  const title = document.getElementById('consult-modal-title');
+  const delBtn = document.getElementById('c-delete-btn');
+  if(id){
+    title.textContent = '상담 수정';
+    delBtn.style.display = '';
+    firebase.database().ref('consult/'+id).once('value', snap=>{
+      const r = snap.val()||{};
+      document.getElementById('c-date').value = r.date||'';
+      document.getElementById('c-receiver').value = r.receiver||'';
+      document.getElementById('c-contact').value = r.contact||'전화';
+      document.getElementById('c-source').value = r.source||'미확인';
+      document.getElementById('c-brand').value = r.brand||'알티오라';
+      document.getElementById('c-name').value = r.name||'';
+      document.getElementById('c-age').value = r.age||'';
+      document.getElementById('c-gender').value = r.gender||'';
+      document.getElementById('c-phone').value = r.phone||'';
+      document.getElementById('c-content').value = r.content||'';
+      document.getElementById('c-meetdate').value = r.meetdate||'';
+      document.getElementById('c-testdate').value = r.testdate||'';
+    });
+  } else {
+    title.textContent = '상담 입력';
+    delBtn.style.display = 'none';
+    // 기본값: 오늘 날짜
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    document.getElementById('c-date').value = today;
+    document.getElementById('c-receiver').value = '';
+    document.getElementById('c-contact').value = '전화';
+    document.getElementById('c-source').value = '미확인';
+    document.getElementById('c-brand').value = '알티오라';
+    document.getElementById('c-name').value = '';
+    document.getElementById('c-age').value = '';
+    document.getElementById('c-gender').value = '';
+    document.getElementById('c-phone').value = '';
+    document.getElementById('c-content').value = '';
+    document.getElementById('c-meetdate').value = '';
+    document.getElementById('c-testdate').value = '';
+  }
+  const consultOverlay = document.getElementById('modal-consult');
+  const consultModal = consultOverlay.querySelector('.modal');
+  // 위치 리셋
+  consultModal.style.position = '';
+  consultModal.style.left = '';
+  consultModal.style.top  = '';
+  consultModal.style.margin = '';
+  consultOverlay.style.alignItems = '';
+  consultOverlay.style.justifyContent = '';
+  consultOverlay.style.display='flex';
+  makeDraggable('consult-modal-header','modal-consult');
+  setTimeout(()=>{ document.getElementById('c-content')?.focus(); }, 100);
+}
+
+function saveConsult(){
+  const date = document.getElementById('c-date').value;
+  if(!date || !date.match(/^\d{4}-\d{2}-\d{2}$/)){
+    toast('날짜를 올바르게 입력해주세요 (YYYYMMDD)', 'warn'); return;
+  }
+  const data = {
+    date,
+    receiver: document.getElementById('c-receiver').value.trim(),
+    contact:  document.getElementById('c-contact').value,
+    source:   document.getElementById('c-source').value,
+    brand:    document.getElementById('c-brand').value,
+    name:     document.getElementById('c-name').value.trim(),
+    age:      parseInt(document.getElementById('c-age').value)||'',
+    gender:   document.getElementById('c-gender').value,
+    phone:    document.getElementById('c-phone').value.trim(),
+    content:  document.getElementById('c-content').value.trim(),
+    meetdate: document.getElementById('c-meetdate').value,
+    testdate: document.getElementById('c-testdate').value,
+    ts: Date.now()
+  };
+  const ref = consultEditId
+    ? firebase.database().ref('consult/'+consultEditId)
+    : firebase.database().ref('consult').push();
+  ref.set(data).then(()=>{
+    document.getElementById('modal-consult').style.display='none';
+    renderConsultPage();
+    toast(consultEditId ? '수정되었습니다.' : '상담이 등록되었습니다.', 'success');
+    consultEditId = null;
+  }).catch(e=>{ toast('저장 실패: '+e.message, 'warn'); });
+}
+
+function deleteConsult(){
+  if(!consultEditId) return;
+  showConfirm('이 상담 내역을 삭제하시겠습니까?', ()=>{
+    firebase.database().ref('consult/'+consultEditId).remove().then(()=>{
+      document.getElementById('modal-consult').style.display='none';
+      renderConsultPage();
+      toast('삭제되었습니다.', 'warn');
+      consultEditId = null;
+    });
+  });
+}
+
+// ── 모달 드래그 이동 ──
+function makeDraggable(headerId, overlayId){
+  const header  = document.getElementById(headerId);
+  const overlay = document.getElementById(overlayId);
+  if(!header || !overlay) return;
+  const modal = overlay.querySelector('.modal');
+  if(!modal) return;
+
+  let startX, startY, origLeft, origTop, dragging = false;
+
+  header.addEventListener('mousedown', e=>{
+    if(e.target.classList.contains('modal-close')) return;
+    dragging = true;
+    // 처음 드래그 시 fixed 포지셔닝으로 전환
+    const rect = modal.getBoundingClientRect();
+    modal.style.position = 'fixed';
+    modal.style.margin   = '0';
+    modal.style.left     = rect.left + 'px';
+    modal.style.top      = rect.top  + 'px';
+    overlay.style.alignItems = 'flex-start';
+    overlay.style.justifyContent = 'flex-start';
+    startX = e.clientX;
+    startY = e.clientY;
+    origLeft = rect.left;
+    origTop  = rect.top;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    modal.style.left = Math.max(0, origLeft + dx) + 'px';
+    modal.style.top  = Math.max(0, origTop  + dy) + 'px';
+  });
+
+  document.addEventListener('mouseup', ()=>{ dragging = false; });
+}
+// ── /모달 드래그 이동 ──
+
+// ── 날짜 자동 포맷 (YYYYMMDD → YYYY-MM-DD) ──
+function autoFormatDate(el){
+  // 숫자만 추출
+  let v = el.value.replace(/[^0-9]/g,'');
+  if(v.length > 8) v = v.slice(0,8);
+  // YYYY-MM-DD 형태로 하이픈 삽입
+  if(v.length >= 5) v = v.slice(0,4)+'-'+v.slice(4);
+  if(v.length >= 8) v = v.slice(0,7)+'-'+v.slice(7);
+  el.value = v;
+  // 유효하지 않으면 빨간 테두리
+  el.style.borderColor = '';
+}
+function validateDateField(el){
+  const v = el.value;
+  if(!v){ el.style.borderColor=''; return; }
+  // YYYY-MM-DD 형식 + 실제 날짜 유효성
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m){ el.style.borderColor='var(--red)'; return; }
+  const d = new Date(v);
+  if(isNaN(d.getTime())||d.toISOString().slice(0,10)!==v){
+    el.style.borderColor='var(--red)';
+  } else {
+    el.style.borderColor='';
+  }
+}
+// ── /날짜 자동 포맷 ──
 
 // ── 드래그 선택 합계 ──
 (function(){
