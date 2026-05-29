@@ -330,18 +330,17 @@ tr.inactive td{opacity:.38;}
             <option value="pangram">팬그램</option>
             <option value="petamus">페타무스</option>
           </select>
-          <select id="bf-class" style="font-size:12px;padding:5px 8px;max-width:150px;">
+          <select id="bf-class" onchange="renderBillingTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
             <option value="">전체 반</option>
           </select>
           <div style="position:relative;">
-            <input type="text" id="bf-search" placeholder="🔍 이름 검색..." onkeydown="if(event.key==='Enter')renderBillingTable()" oninput="document.getElementById('bf-search-clear').style.display=this.value?'flex':'none';"
+            <input type="text" id="bf-search" placeholder="🔍 이름 검색..." oninput="renderBillingTable();document.getElementById('bf-search-clear').style.display=this.value?'flex':'none';"
               style="font-size:12px;padding:5px 26px 5px 10px;border:1px solid var(--border);border-radius:6px;width:130px;background:var(--surface);">
             <span id="bf-search-clear" onclick="document.getElementById('bf-search').value='';renderBillingTable();this.style.display='none';"
               style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;align-items:center;">✕</span>
           </div>
           <input type="hidden" id="bf-item" value="">
           <button id="bf-clear-all" onclick="clearAllBillingFilters()" style="display:none;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--warn-bg,#fef3dc);cursor:pointer;color:var(--text2);">✕ 필터 초기화</button>
-          <button class="btn btn-primary btn-sm" onclick="renderBillingTable()" style="white-space:nowrap;">🔍 조회</button>
         </div>
         <div class="table-wrap" style="max-height:60vh;overflow-y:auto;"><table><thead id="billing-thead" style="position:sticky;top:0;z-index:10;"></thead><tbody id="billing-tbody"></tbody></table></div>
         <div id="billing-class-summary" style="margin-top:0;"></div>
@@ -366,15 +365,15 @@ tr.inactive td{opacity:.38;}
       <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:13px;">
         <div style="position:relative;flex:1;min-width:180px;max-width:240px;">
           <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);">🔍</span>
-          <input type="text" id="student-search" placeholder="이름, 영어명..." onkeydown="if(event.key==='Enter')renderStudentTable()" oninput="toggleSearchClear()" style="padding-left:28px;padding-right:26px;">
+          <input type="text" id="student-search" placeholder="이름, 영어명..." oninput="renderStudentTable();toggleSearchClear()" style="padding-left:28px;padding-right:26px;">
           <span id="search-clear" onclick="clearStudentSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;line-height:1;">✕</span>
         </div>
-        <select id="sf-brand" onchange="updateStudentClassFilter();" style="font-size:12px;padding:6px 9px;max-width:115px;">
+        <select id="sf-brand" onchange="updateStudentClassFilter();renderStudentTable();" style="font-size:12px;padding:6px 9px;max-width:115px;">
           <option value="">전체 브랜드</option><option value="altiora">알티오라</option><option value="pangram">팬그램</option><option value="petamus">페타무스</option>
         </select>
-        <select id="sf-class" style="font-size:12px;padding:6px 9px;max-width:155px;"><option value="">전체 반</option></select>
-        <select id="sf-status" style="font-size:12px;padding:6px 9px;max-width:115px;"><option value="all">전체</option><option value="active" selected>활성만</option><option value="inactive">퇴원생만</option></select>
-        <select id="sf-special" style="font-size:12px;padding:6px 9px;max-width:140px;">
+        <select id="sf-class" onchange="renderStudentTable()" style="font-size:12px;padding:6px 9px;max-width:155px;"><option value="">전체 반</option></select>
+        <select id="sf-status" onchange="renderStudentTable()" style="font-size:12px;padding:6px 9px;max-width:115px;"><option value="all">전체</option><option value="active" selected>활성만</option><option value="inactive">퇴원생만</option></select>
+        <select id="sf-special" onchange="renderStudentTable()" style="font-size:12px;padding:6px 9px;max-width:140px;">
           <option value="">전체 조건</option>
           <option value="sibling">형제 할인</option>
           <option value="shuttle_none">셔틀 개별</option>
@@ -382,7 +381,6 @@ tr.inactive td{opacity:.38;}
           <option value="care">돌봄 있음</option>
           <option value="onetone">1:1 수업</option>
         </select>
-        <button class="btn btn-primary" onclick="renderStudentTable()" style="white-space:nowrap;">🔍 조회</button>
         <div class="ml-auto" style="display:flex;gap:8px;">
           <button class="btn btn-secondary" onclick="downloadStudentTemplate()">📋 서식 다운로드</button>
           <button class="btn btn-secondary" onclick="document.getElementById('upload-excel').click()">📤 엑셀 업로드</button>
@@ -443,16 +441,15 @@ tr.inactive td{opacity:.38;}
           <div class="card-header">
             <div class="card-title">반별 교재비 설정</div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <select id="tb-filter-brand" style="font-size:12px;padding:5px 8px;max-width:110px;">
+              <select id="tb-filter-brand" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:110px;">
                 <option value="">전체 브랜드</option>
                 <option value="altiora">알티오라</option>
                 <option value="pangram">팬그램</option>
                 <option value="petamus">페타무스</option>
               </select>
-              <select id="tb-filter-cls" style="font-size:12px;padding:5px 8px;max-width:150px;">
+              <select id="tb-filter-cls" onchange="renderTextbookTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
                 <option value="">전체 반</option>
               </select>
-              <button class="btn btn-primary btn-sm" onclick="renderTextbookTable()" style="white-space:nowrap;">🔍 조회</button>
               <button class="btn btn-primary btn-sm" onclick="openTextbookModal()">+ 추가</button>
               <button class="btn btn-secondary btn-sm" onclick="openTbFromMaster()">📚 교재 마스터에서 배정</button>
             </div>
@@ -472,16 +469,15 @@ tr.inactive td{opacity:.38;}
           <div class="card-header">
             <div class="card-title">교재 마스터</div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <input type="text" id="tbm-search" placeholder="교재명 검색..." onkeydown="if(event.key==='Enter')renderTbMaster()"
+              <input type="text" id="tbm-search" placeholder="교재명 검색..." oninput="renderTbMaster()"
                 style="font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;width:160px;">
-              <select id="tbm-filter-brand" style="font-size:12px;padding:5px 8px;">
+              <select id="tbm-filter-brand" onchange="renderTbMaster()" style="font-size:12px;padding:5px 8px;">
                 <option value="">전체 브랜드</option>
                 <option value="altiora">알티오라</option>
                 <option value="pangram">팬그램</option>
                 <option value="petamus">페타무스</option>
                 <option value="공통">공통</option>
               </select>
-              <button class="btn btn-primary btn-sm" onclick="renderTbMaster()" style="white-space:nowrap;">🔍 조회</button>
               <button class="btn btn-primary btn-sm" onclick="openTbMasterModal()">+ 교재 등록</button>
             </div>
           </div>
