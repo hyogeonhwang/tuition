@@ -32,7 +32,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .logo-year{display:inline-flex;align-items:center;gap:5px;background:var(--accent-dim);color:var(--accent2);font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:5px;}
 .logo-sub{font-size:10px;color:var(--text3);margin-top:3px;font-family:'JetBrains Mono',monospace;}
 .nav{flex:1;padding:8px 0;overflow-y:auto;}
-.nav-section{padding:10px 14px 3px;font-size:10px;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;font-weight:600;}
+.nav-section{padding:10px 14px 3px;font-size:10px;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;}
+.nav-section:hover{color:var(--text2);}
+.nav-group{overflow:hidden;transition:max-height .25s ease;}
 .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;margin:1px 6px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:400;transition:all .12s;position:relative;}
 .nav-item:hover{background:var(--surface2);color:var(--text);}
 .nav-item.active{background:var(--accent-dim);color:var(--accent2);font-weight:600;}
@@ -236,22 +238,30 @@ tr.inactive td{opacity:.38;}
     <div class="logo-sub">알티오라 · 팬그램 · 페타무스</div>
   </div>
   <div class="nav">
-    <div class="nav-section">메인</div>
-    <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">📊</span>대시보드</div>
-    <div class="nav-section">수납</div>
-    <div class="nav-item" onclick="showPage('billing')"><span class="nav-icon">🧾</span>월별 청구 생성</div>
-    <div class="nav-item" onclick="showPage('students')"><span class="nav-icon">👦</span>원생 관리</div>
-    <div class="nav-item" onclick="showPage('special')"><span class="nav-icon">⚠️</span>특이사항 체크</div>
-    <div class="nav-section">보고</div>
-    <div class="nav-item" onclick="showPage('monthly')"><span class="nav-icon">📋</span>월말 보고</div>
-    <div class="nav-item" onclick="showPage('consult')"><span class="nav-icon">📞</span>주간 상담 일지</div>
-    <div class="nav-section">설정</div>
-    <div class="nav-item" onclick="showPage('master')"><span class="nav-icon">⚙️</span>단가 설정</div>
-    <div class="nav-item" onclick="showPage('textbook')"><span class="nav-icon">📚</span>외부교재비 설정</div>
-    <div class="nav-item" onclick="showPage('sms')"><span class="nav-icon">📱</span>SMS 템플릿</div>
-    <div class="nav-item" onclick="showPage('classconfig')"><span class="nav-icon">🏫</span>반 목록 관리</div>
-    <div class="nav-item" onclick="showPage('yearend')"><span class="nav-icon">📅</span>학년도 관리</div>
-    <div class="nav-item" onclick="showPage('calc')"><span class="nav-icon">🔢</span>계산기</div>
+    <div class="nav-section" onclick="toggleNavGroup('nav-main')">메인<span id="nav-main-arrow">▾</span></div>
+    <div class="nav-group" id="nav-main">
+      <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">📊</span>대시보드</div>
+    </div>
+    <div class="nav-section" onclick="toggleNavGroup('nav-billing')">수납<span id="nav-billing-arrow">▾</span></div>
+    <div class="nav-group" id="nav-billing">
+      <div class="nav-item" onclick="showPage('billing')"><span class="nav-icon">🧾</span>월별 청구 생성</div>
+      <div class="nav-item" onclick="showPage('students')"><span class="nav-icon">👦</span>원생 관리</div>
+      <div class="nav-item" onclick="showPage('special')"><span class="nav-icon">⚠️</span>특이사항 체크</div>
+    </div>
+    <div class="nav-section" onclick="toggleNavGroup('nav-report')">보고<span id="nav-report-arrow">▾</span></div>
+    <div class="nav-group" id="nav-report">
+      <div class="nav-item" onclick="showPage('monthly')"><span class="nav-icon">📋</span>월말 보고</div>
+      <div class="nav-item" onclick="showPage('consult')"><span class="nav-icon">📞</span>주간 상담 일지</div>
+    </div>
+    <div class="nav-section" onclick="toggleNavGroup('nav-settings')">설정<span id="nav-settings-arrow">▸</span></div>
+    <div class="nav-group" id="nav-settings" style="max-height:0;">
+      <div class="nav-item" onclick="showPage('master')"><span class="nav-icon">⚙️</span>단가 설정</div>
+      <div class="nav-item" onclick="showPage('textbook')"><span class="nav-icon">📚</span>외부교재비 설정</div>
+      <div class="nav-item" onclick="showPage('sms')"><span class="nav-icon">📱</span>SMS 템플릿</div>
+      <div class="nav-item" onclick="showPage('classconfig')"><span class="nav-icon">🏫</span>반 목록 관리</div>
+      <div class="nav-item" onclick="showPage('yearend')"><span class="nav-icon">📅</span>학년도 관리</div>
+      <div class="nav-item" onclick="showPage('calc')"><span class="nav-icon">🔢</span>계산기</div>
+    </div>
   </div>
   <div class="sidebar-bottom" id="sidebar-bottom">v2.0</div>
 </nav>
@@ -1598,6 +1608,7 @@ async function init(){
   updateClassOptions();updateTbClass();updateStudentClassFilter();
   renderDashboard();renderStudentTable();renderTextbookTable();renderMasterContent('tuition');renderSpecialList('all');renderArchiveList();
   // 항상 대시보드로 시작
+  initNavGroups();
   showPage('dashboard');
 
 }
@@ -1621,8 +1632,8 @@ const PAGE_TITLES={
   calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'월말 보고', consult:'주간 상담 일지'
 };
 function showPage(p){
-  // 주간 상담 탭 벗어날 때 실시간 리스너 해제
   if(p !== 'consult') detachConsultListener();
+  expandNavGroupForPage(p); // 해당 페이지 섹션 자동 펼치기
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -4927,6 +4938,50 @@ function clearBillingOverride(sid, field){
   renderBillingTable();
 }
 // ── /청구 수기 금액 수정 ──
+
+// ── 사이드바 섹션 접기/펼치기 ──
+function toggleNavGroup(id){
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id+'-arrow');
+  if(!el) return;
+  const isOpen = el.style.maxHeight && el.style.maxHeight !== '0px' && el.style.maxHeight !== '0';
+  el.style.maxHeight = isOpen ? '0' : el.scrollHeight + 'px';
+  if(arrow) arrow.textContent = isOpen ? '▸' : '▾';
+  localStorage.setItem('navGroup_'+id, isOpen ? '0' : '1');
+}
+
+function expandNavGroupForPage(p){
+  const map = {
+    dashboard:'nav-main',
+    billing:'nav-billing', students:'nav-billing', special:'nav-billing',
+    monthly:'nav-report', consult:'nav-report',
+    master:'nav-settings', textbook:'nav-settings', sms:'nav-settings',
+    classconfig:'nav-settings', yearend:'nav-settings', calc:'nav-settings'
+  };
+  const groupId = map[p];
+  if(!groupId) return;
+  const el = document.getElementById(groupId);
+  const arrow = document.getElementById(groupId+'-arrow');
+  if(!el) return;
+  el.style.maxHeight = el.scrollHeight + 500 + 'px'; // 여유있게
+  if(arrow) arrow.textContent = '▾';
+  localStorage.setItem('navGroup_'+groupId, '1');
+}
+
+function initNavGroups(){
+  ['nav-main','nav-billing','nav-report','nav-settings'].forEach(id=>{
+    const el = document.getElementById(id);
+    const arrow = document.getElementById(id+'-arrow');
+    if(!el) return;
+    const saved = localStorage.getItem('navGroup_'+id);
+    // 설정은 기본 접힘, 나머지는 기본 펼침
+    const defaultOpen = id !== 'nav-settings';
+    const isOpen = saved !== null ? saved === '1' : defaultOpen;
+    el.style.maxHeight = isOpen ? el.scrollHeight + 500 + 'px' : '0';
+    if(arrow) arrow.textContent = isOpen ? '▾' : '▸';
+  });
+}
+// ── /사이드바 섹션 접기/펼치기 ──
 
 // ── 드래그 선택 합계 ──
 (function(){
