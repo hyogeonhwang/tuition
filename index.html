@@ -1329,6 +1329,8 @@ async function loadYearDataFromFB(y){
         data.tbMaster = Object.values(data.tbMaster);
       // freq 마이그레이션: 'kelpie' → '3'
       (data.students||[]).forEach(st=>{ if(st.freq==='kelpie') st.freq='3'; });
+      // care 마이그레이션: '1회' → '주1회' (1회성 옵션 제거로 인한 보정)
+      (data.students||[]).forEach(st=>{ if(st.care==='1회') st.care='주1회'; });
       // freq 마이그레이션: 반 이름 기준 자동 보정
       // 화목반(주2회) → freq='2', Tier반(초등 주3회) → freq='3e'
       const FREQ_BY_CLS = {
@@ -1366,8 +1368,20 @@ async function loadYearDataFromFB(y){
         }
       });
       if(feePatched){
-        // 보완된 내용 Firebase에 즉시 반영
         fbSave('data_'+y+'/master/feeItems', data.master.feeItems).catch(()=>{});
+      }
+      // care 배열 누락 항목 자동 보완 (care_1w, care_2 등 신규 추가 항목)
+      const defCare = defaultMaster().care;
+      if(!data.master.care) data.master.care = [];
+      let carePatched = false;
+      defCare.forEach(defItem=>{
+        if(!data.master.care.find(x=>x.key===defItem.key)){
+          data.master.care.push(defItem);
+          carePatched = true;
+        }
+      });
+      if(carePatched){
+        fbSave('data_'+y+'/master/care', data.master.care).catch(()=>{});
       }
       return data;
     }
@@ -2679,7 +2693,11 @@ function openStudentModal(idx=-1){
     const htimeFinal = document.getElementById('s-htime');
     if(htimeFinal) htimeFinal.value = s.htime;
   }
-  document.getElementById('modal-student').classList.add('open');
+  const _sm = document.getElementById('modal-student');
+  _sm.classList.add('open');
+  // 모달 내용 스크롤 맨 위로
+  const _smInner = _sm.querySelector('.modal');
+  if(_smInner) _smInner.scrollTop = 0;
 }
 function saveStudent(){
   const name=document.getElementById('s-name').value.trim();
