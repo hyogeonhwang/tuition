@@ -945,8 +945,23 @@ tr.inactive td{opacity:.38;}
       </div>
     </div>
     <div id="deduct-preview" style="background:var(--yellow-bg);border:1px solid rgba(192,124,16,.2);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:var(--yellow);margin-top:4px;display:none;"></div>
+    <!-- 수기 교습비 직접 입력 -->
+    <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;">✏️ 교습비 수기 직접 입력 (차감과 별개)</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>수기 금액</label>
+          <input type="number" id="tuition-override-amount" placeholder="직접 입력" step="1000">
+        </div>
+        <div class="form-group full">
+          <label>수정 사유 메모</label>
+          <input type="text" id="tuition-override-memo" placeholder="예: 중도 입학으로 반월 적용">
+        </div>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeDeductModal()">취소</button>
+      <button class="btn btn-secondary" onclick="applyTuitionOverride()" id="tuition-override-btn">수기금액 적용</button>
       <button class="btn btn-danger" onclick="applyDeduct()">차감 적용</button>
     </div>
   </div>
@@ -1606,6 +1621,8 @@ const PAGE_TITLES={
   calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'월말 보고', consult:'주간 상담 일지'
 };
 function showPage(p){
+  // 주간 상담 탭 벗어날 때 실시간 리스너 해제
+  if(p !== 'consult') detachConsultListener();
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -1689,33 +1706,7 @@ function renderDashboard(viewMonth){
     empty: '이번 달 처리할 특이사항 없음'
   });
 
-  // 3. 이번 달 신규생
-  const _pad = n => String(n).padStart(2,'0');
-  const _mStart = `${viewYear}-${_pad(m)}-01`;
-  const _mEnd   = `${viewYear}-${_pad(m)}-${_pad(new Date(viewYear,m,0).getDate())}`;
-  const _inMonth = d => d && d>=_mStart && d<=_mEnd;
-  const _newStudents = S().filter(s=>_inMonth(s.joinDate)).sort((a,b)=>a.joinDate>b.joinDate?1:-1);
-  sections.push({
-    icon:'🆕', label:'이번 달 신규생', color:'var(--accent)',
-    count: _newStudents.length,
-    items: _newStudents.map(s=>({text:`${s.name}(${s.cls}) — ${s.joinDate.replace(/-/g,'.')} 입회`, sid:s.id})),
-    empty: '이번 달 신규생 없음'
-  });
-
-  // 4. 이번 달 퇴원생 (월말보고와 동일 기준 — 퇴원일이 해당 월)
-  const _ymDash = `${viewYear}-${_pad(m)}`;
-  const _leftStudents = S().filter(s=>{
-    if(!s.leaveMonth) return false;
-    return _inMonth(s.leaveMonth) || s.leaveMonth.slice(0,7)===_ymDash;
-  }).sort((a,b)=>a.leaveMonth>b.leaveMonth?1:-1);
-  sections.push({
-    icon:'👋', label:'이번 달 퇴원생', color:'var(--text2)',
-    count: _leftStudents.length,
-    items: _leftStudents.map(s=>({text:`${s.name}(${s.cls}) — ${(s.leaveMonth||'').replace(/-/g,'.')} 퇴원${s.leaveReason?' ('+s.leaveReason+')':''}`, sid:s.id})),
-    empty: '이번 달 퇴원생 없음'
-  });
-
-  // 3. 이달 알림 — 해당 월 날짜 포함 메모만
+  // 이달 알림 — 해당 월 날짜 포함 메모만
   const mStr = String(m);
   const alertList = active.filter(s=>{
     if(!s.memo) return false;
@@ -1880,6 +1871,7 @@ function toggleAccordion(idx){
 // BILLING
 // ══════════════════════════════════════════════
 let currentBilling=[],currentBillingMonth=0;
+let billingOverrides = {}; // {sid: {field: {amount, memo}}} — 수기 금액 수정
 let otRowMap = {}; // 전역 — renderBillingTable에서 갱신, showExtraItemsPopup에서 참조
 // 차감 데이터: { studentId: {days, rate, amount, reason, memo} }
 let deductions={};
@@ -1926,6 +1918,7 @@ function generateBilling(silent=false){
   const year=parseInt(document.getElementById('billing-year').value);
   const month=parseInt(document.getElementById('billing-month').value);
   currentBillingMonth=month;
+  billingOverrides = {}; // 청구 재생성 시 수기 수정 초기화
   const ym = String(year)+String(month).padStart(2,'0');
   localStorage.setItem('last_billing_ym', ym);
   const isQ=isQM(month),isS=isSM(month);
@@ -2249,16 +2242,22 @@ function renderBillingTable(){
         <span class="text-xs text-muted">${s.ename}</span>
       </td>
       <td class="mono text-right">
-        <div class="deduct-cell" onclick="openDeductModal('${s.id}')" title="클릭하여 차감 입력"
+        <div class="deduct-cell" onclick="openDeductModal('${s.id}')" title="클릭하여 차감/수기 입력"
           style="cursor:pointer;position:relative;">
           ${(()=>{
             const deductAmt = deductions[s.id]?.amount||0;
-            // 차감 있으면 형제할인 무효 — 원래 교습비로 청구
             const effectiveSibling = deductAmt > 0 ? 0 : (a.sibling||0);
-            const baseTuition = a.tuition + (a.sibling||0); // 할인 전 원래 교습비
-            const displayTuition = baseTuition - effectiveSibling; // 표시 교습비
-            const netTuition = displayTuition - deductAmt;  // 최종 납부
+            const baseTuition = a.tuition + (a.sibling||0);
+            const displayTuition = baseTuition - effectiveSibling;
+            const netTuition = displayTuition - deductAmt;
             const hasDeduct = effectiveSibling>0 || deductAmt>0;
+            const tuitionOv = billingOverrides[s.id]?.['tuition'];
+            if(tuitionOv){
+              return `<span style="color:var(--red);font-weight:700;text-decoration:underline dotted;"
+                title="${tuitionOv.memo?'수기수정: '+tuitionOv.memo:'수기수정'}">${won(tuitionOv.amount)}</span>
+                <div style="font-size:10px;color:var(--text3);">원 ${won(hasDeduct?netTuition:displayTuition)}</div>
+                ${deductAmt?`<div class="amount-breakdown" style="color:var(--red);">${deductions[s.id].reason} -${won(deductAmt)}<span onclick="event.stopPropagation();clearDeduct('${s.id}')" style="margin-left:4px;cursor:pointer;font-size:11px;">✕</span></div>`:''}`;
+            }
             return hasDeduct
               ? `<div style="font-weight:700;color:var(--accent2);">${won(netTuition)}</div>
                  <div style="font-size:11px;color:var(--text3);margin-top:1px;">(원 ${won(baseTuition)})</div>
@@ -2268,13 +2267,13 @@ function renderBillingTable(){
           })()}
         </div>
       </td>
-      ${hasPkg?`<td class="mono text-right">${a.textbook_pkg?won(a.textbook_pkg):'<span class="text-muted">-</span>'}</td>`:''}
-      ${hasShuttle?`<td class="mono text-right">${a.shuttle?won(a.shuttle):'<span class="text-muted">-</span>'}</td>`:''}
-      ${hasExtTB?`<td class="mono text-right">${a.ext_textbook?won(a.ext_textbook):'<span class="text-muted">-</span>'}</td>`:''}
-      ${hasMat?`<td class="mono text-right">${a.material_alt?won(a.material_alt):'<span class="text-muted">-</span>'}</td>`:''}
-      ${hasSci?`<td class="mono text-right">${a.science?won(a.science):'<span class="text-muted">-</span>'}</td>`:''}
-      ${hasSnack?`<td class="mono text-right">${a.snack?won(a.snack):'<span class="text-muted">-</span>'}</td>`:''}
-      ${hasCare?`<td class="mono text-right">${a.care?won(a.care):'<span class="text-muted">-</span>'}</td>`:''}
+      ${hasPkg?`<td class="mono text-right" onclick="openBillingOverride('${s.id}','textbook_pkg',${a.textbook_pkg||0},'패키지교재비')" style="cursor:pointer;">${renderOverrideCell(s.id,'textbook_pkg',a.textbook_pkg||0)}</td>`:''}
+      ${hasShuttle?`<td class="mono text-right" onclick="openBillingOverride('${s.id}','shuttle',${a.shuttle||0},'셔틀비')" style="cursor:pointer;">${renderOverrideCell(s.id,'shuttle',a.shuttle||0)}</td>`:''}
+      ${hasExtTB?`<td class="mono text-right" onclick="openBillingOverride('${s.id}','ext_textbook',${a.ext_textbook||0},'외부교재비')" style="cursor:pointer;">${renderOverrideCell(s.id,'ext_textbook',a.ext_textbook||0)}</td>`:''}
+      ${hasMat?`<td class="mono text-right" onclick="openBillingOverride('${s.id}','material_alt',${a.material_alt||0},'재료비')" style="cursor:pointer;">${renderOverrideCell(s.id,'material_alt',a.material_alt||0)}</td>`:''}
+      ${hasSci?`<td class="mono text-right" onclick="openBillingOverride('${s.id}','science',${a.science||0},'과학재료비')" style="cursor:pointer;">${renderOverrideCell(s.id,'science',a.science||0)}</td>`:''}
+      ${hasSnack?`<td class="mono text-right" onclick="openBillingOverride('${s.id}','snack',${a.snack||0},'간식비')" style="cursor:pointer;">${renderOverrideCell(s.id,'snack',a.snack||0)}</td>`:''}
+      ${hasCare?`<td class="mono text-right" onclick="openBillingOverride('${s.id}','care',${a.care||0},'돌봄비')" style="cursor:pointer;">${renderOverrideCell(s.id,'care',a.care||0)}</td>`:''}
       ${hasOT?`<td class="mono text-right">${(()=>{
         const otItems = otRowMap[s.id];
         if(!otItems||!otItems.length) return '<span class="text-muted">-</span>';
@@ -2288,7 +2287,14 @@ function renderBillingTable(){
         const effSib = d>0 ? 0 : (a.sibling||0);
         const cancelledSib = d>0 ? (a.sibling||0) : 0;
         const otAmt = (otRowMap[s.id]||[]).reduce((sum,r)=>sum+(r.amount||0),0);
-        return won(a.total - d + cancelledSib + otAmt);
+        // override 적용 — 수정된 항목은 차이만큼 가감
+        const ov = billingOverrides[s.id]||{};
+        let overrideDiff = 0;
+        Object.entries(ov).forEach(([field,o])=>{
+          const orig = a[field]||0;
+          overrideDiff += (o.amount - orig);
+        });
+        return won(a.total - d + cancelledSib + otAmt + overrideDiff);
       })()}</td>
       <td style="white-space:nowrap;">${flags.join(' ')}</td>
       <td style="text-align:center;position:relative;">
@@ -3645,6 +3651,10 @@ function openDeductModal(sid) {
   document.getElementById('deduct-rate').value = deductions[sid]?.rate || rate;
   document.getElementById('deduct-reason').value = deductions[sid]?.reason || '병결';
   document.getElementById('deduct-memo').value = deductions[sid]?.memo || '';
+  // 수기 금액 복원
+  const tuitionOv = billingOverrides[sid]?.['tuition'];
+  document.getElementById('tuition-override-amount').value = tuitionOv ? tuitionOv.amount : '';
+  document.getElementById('tuition-override-memo').value = tuitionOv ? tuitionOv.memo : '';
   calcDeductPreview();
   document.getElementById('modal-deduct').classList.add('open');
 }
@@ -3675,6 +3685,22 @@ function applyDeduct() {
   renderBillingTable();
   updateBillingTotals();
   toast(`차감 ${won(amount)} 적용되었습니다. (${reason})`,'warn');
+}
+
+function applyTuitionOverride(){
+  const amtEl  = document.getElementById('tuition-override-amount');
+  const memoEl = document.getElementById('tuition-override-memo');
+  const amt = parseInt(amtEl?.value);
+  if(!amt){ toast('수기 금액을 입력하세요.','warn'); return; }
+  const memo = memoEl?.value.trim()||'';
+  const sid = deductTargetId;
+  if(!billingOverrides[sid]) billingOverrides[sid]={};
+  const item = currentBilling.find(x=>x.s.id===sid);
+  billingOverrides[sid]['tuition'] = { amount:amt, memo, origAmt: item?.a?.tuition||0 };
+  closeModal('modal-deduct');
+  renderBillingTable();
+  updateBillingTotals();
+  toast(`교습비 수기 ${won(amt)} 적용됨`,'success');
 }
 
 function clearDeduct(sid) {
@@ -4515,31 +4541,45 @@ function initConsultPage(){
   renderConsultPage();
 }
 
+// 실시간 리스너 참조 — 탭 이탈 시 해제용
+let consultListener = null;
+let consultListenerRef = null;
+
+function detachConsultListener(){
+  if(consultListenerRef && consultListener){
+    consultListenerRef.off('value', consultListener);
+    consultListenerRef = null;
+    consultListener = null;
+  }
+}
+
 function renderConsultPage(){
   if(!consultMonday) consultMonday = getMonday(new Date());
   const mon = new Date(consultMonday);
   const fri = new Date(mon); fri.setDate(mon.getDate() + 4);
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
   const monStr = fmtDate(mon);
-  const sunStr = fmtDate(sun); // 일요일까지 포함 (주말 입력 대비)
-  const friStr = fmtDate(fri);
+  const sunStr = fmtDate(sun);
 
   const dayKo = ['일','월','화','수','목','금','토'];
   const lbl = `${mon.getMonth()+1}/${mon.getDate()}(${dayKo[mon.getDay()]}) ~ ${fri.getMonth()+1}/${fri.getDate()}(${dayKo[fri.getDay()]})`;
   const labelEl = document.getElementById('consult-week-label');
   if(labelEl) labelEl.textContent = lbl;
 
-  // Firebase에서 해당 주 데이터 조회 (월~일)
-  firebase.database().ref('consult')
-    .orderByChild('date').startAt(monStr).endAt(sunStr+'￿')
-    .once('value', snap=>{
-      const rows = [];
-      snap.forEach(c=>{ rows.push({id:c.key, ...c.val()}); });
-      rows.sort((a,b)=> a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
-      consultRows = rows;
-      renderConsultFilter(); // 검색어 적용 후 렌더
-      renderConsultSummary(rows, lbl); // 요약은 전체 기준
-    });
+  // 기존 리스너 해제 후 새로 등록
+  detachConsultListener();
+  const ref = firebase.database().ref('consult')
+    .orderByChild('date').startAt(monStr).endAt(sunStr+'\uffff');
+  consultListenerRef = ref;
+
+  consultListener = ref.on('value', snap=>{
+    const rows = [];
+    snap.forEach(c=>{ rows.push({id:c.key, ...c.val()}); });
+    rows.sort((a,b)=> a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
+    consultRows = rows;
+    renderConsultFilter();
+    renderConsultSummary(rows, lbl);
+  });
 }
 
 function renderConsultFilter(){
@@ -4793,6 +4833,100 @@ function validateDateField(el){
   }
 }
 // ── /날짜 자동 포맷 ──
+
+
+// ── 청구 수기 금액 수정 ──
+function renderOverrideCell(sid, field, origAmt){
+  const ov = billingOverrides[sid]?.[field];
+  if(!ov) return origAmt ? won(origAmt) : '<span class="text-muted">-</span>';
+  const memo = ov.memo ? ov.memo : '';
+  return `<span style="color:var(--red);font-weight:700;text-decoration:underline dotted;cursor:pointer;"
+    title="${memo ? '수기수정: '+memo : '수기수정'}">${won(ov.amount)}</span>
+    <div style="font-size:10px;color:var(--text3);">원 ${won(origAmt)}</div>`;
+}
+
+function openBillingOverride(sid, field, origAmt, label){
+  // 기존 팝업 제거
+  const ep = document.getElementById('billing-override-popup');
+  if(ep){ ep.remove(); if(ep.dataset.sid===sid && ep.dataset.field===field) return; }
+
+  const ov = billingOverrides[sid]?.[field];
+  const curAmt = ov ? ov.amount : origAmt;
+  const curMemo = ov ? ov.memo : '';
+
+  const popup = document.createElement('div');
+  popup.id = 'billing-override-popup';
+  popup.dataset.sid = sid;
+  popup.dataset.field = field;
+  popup.style.cssText = `
+    position:fixed;z-index:9100;background:var(--surface);
+    border:1px solid var(--border2);border-radius:var(--radius);
+    padding:14px;box-shadow:0 4px 20px rgba(26,31,54,.18);
+    min-width:240px;`;
+
+  const s = S().find(x=>x.id===sid);
+  popup.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;">
+      ${s?.name||''} — ${label} 수기 수정
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">
+      원래 금액: ${won(origAmt)}
+    </div>
+    <input id="ov-amount" type="number" value="${curAmt}"
+      style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;margin-bottom:8px;"
+      onkeydown="if(event.key==='Enter') saveBillingOverride('${sid}','${field}',${origAmt})">
+    <input id="ov-memo" type="text" value="${curMemo}" placeholder="수정 사유 메모..."
+      style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:10px;"
+      onkeydown="if(event.key==='Enter') saveBillingOverride('${sid}','${field}',${origAmt})">
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      ${ov?`<button onclick="clearBillingOverride('${sid}','${field}')"
+        style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-size:12px;color:var(--red);">
+        원복</button>`:''}
+      <button onclick="document.getElementById('billing-override-popup')?.remove()"
+        style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;font-size:12px;">
+        취소</button>
+      <button onclick="saveBillingOverride('${sid}','${field}',${origAmt})"
+        style="padding:5px 12px;border:none;border-radius:6px;background:var(--accent2);color:#fff;cursor:pointer;font-size:12px;font-weight:600;">
+        확인</button>
+    </div>`;
+
+  document.body.appendChild(popup);
+  // 화면 중앙 배치
+  popup.style.top  = '50%';
+  popup.style.left = '50%';
+  popup.style.transform = 'translate(-50%,-50%)';
+  popup.querySelector('#ov-amount').focus();
+  popup.querySelector('#ov-amount').select();
+
+  setTimeout(()=>{
+    document.addEventListener('click', function _close(e){
+      if(!popup.contains(e.target)){
+        popup.remove();
+        document.removeEventListener('click', _close);
+      }
+    });
+  }, 0);
+}
+
+function saveBillingOverride(sid, field, origAmt){
+  const amtEl  = document.getElementById('ov-amount');
+  const memoEl = document.getElementById('ov-memo');
+  if(!amtEl) return;
+  const newAmt = parseInt(amtEl.value)||0;
+  const memo   = memoEl?.value.trim()||'';
+  if(!billingOverrides[sid]) billingOverrides[sid] = {};
+  billingOverrides[sid][field] = { amount: newAmt, memo, origAmt };
+  document.getElementById('billing-override-popup')?.remove();
+  renderBillingTable();
+  toast(`${S().find(x=>x.id===sid)?.name} ${field} 금액 수정됨`, 'success', 2000);
+}
+
+function clearBillingOverride(sid, field){
+  if(billingOverrides[sid]) delete billingOverrides[sid][field];
+  document.getElementById('billing-override-popup')?.remove();
+  renderBillingTable();
+}
+// ── /청구 수기 금액 수정 ──
 
 // ── 드래그 선택 합계 ──
 (function(){
