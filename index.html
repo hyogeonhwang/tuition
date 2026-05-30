@@ -331,6 +331,7 @@ tr.inactive td{opacity:.38;}
         </div>
         <button class="btn btn-primary btn-lg" id="btn-generate" onclick="generateBilling()">⚡ 청구서 생성</button>
         <button id="btn-close-billing" class="btn btn-secondary btn-lg" onclick="closeBilling()" style="display:none;">🔒 이달 마감</button>
+        <button id="btn-unclose-billing" class="btn btn-danger btn-lg" onclick="uncloseBilling()" style="display:none;">🔓 마감 해지</button>
         <div id="billing-type-tags" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"></div>
         <button class="btn btn-success ml-auto" onclick="exportBillingCSV()" id="btn-export" style="display:none">📥 CSV 다운로드</button>
       </div>
@@ -1979,6 +1980,7 @@ function generateBilling(silent=false){
   const ymCheck = String(year)+String(month).padStart(2,'0');
   const isClosed = CY.billings?.[ymCheck]?.closed;
   document.getElementById('btn-close-billing').style.display = isClosed ? 'none' : 'inline-flex';
+  document.getElementById('btn-unclose-billing').style.display = isClosed ? 'inline-flex' : 'none';
   updateBillingClassFilter();renderBillingTable();
   checkBillingAlerts(month);
   if(!silent && btn){ btn.textContent='⚡ 청구서 생성'; btn.disabled=false; }
@@ -2004,9 +2006,24 @@ function closeBilling(){
     });
     saveYearData();
     document.getElementById('btn-close-billing').style.display='none';
+    document.getElementById('btn-unclose-billing').style.display='inline-flex';
     toast(`${year}년 ${month}월 마감됐습니다.`, 'success');
   }, '청구서 마감', '마감');
 }
+function uncloseBilling(){
+  const year=parseInt(document.getElementById('billing-year').value);
+  const month=parseInt(document.getElementById('billing-month').value);
+  showConfirm(`${year}년 ${month}월 마감을 해지하시겠습니까?
+해지 후 청구서를 다시 생성할 수 있습니다.`, ()=>{
+    const ym = String(year)+String(month).padStart(2,'0');
+    if(CY.billings?.[ym]) delete CY.billings[ym];
+    saveYearData();
+    document.getElementById('btn-close-billing').style.display='inline-flex';
+    document.getElementById('btn-unclose-billing').style.display='none';
+    toast(`${year}년 ${month}월 마감이 해지됐습니다.`, 'warn');
+  }, '마감 해지', '해지');
+}
+
 function checkBillingAlerts(month) {
   const alerts = [];
   const isQ = isQM(month), isS = isSM(month);
