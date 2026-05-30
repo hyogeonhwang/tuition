@@ -125,7 +125,7 @@ textarea{resize:vertical;min-height:68px;}
 
 /* BILLING */
 .billing-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
-.billing-totals{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+.billing-totals{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
 .billing-total-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;text-align:center;box-shadow:var(--shadow-sm);}
 .billing-total-label{font-size:11px;color:var(--text3);margin-bottom:5px;}
 .billing-total-value{font-size:19px;font-weight:700;font-family:'JetBrains Mono',monospace;}
@@ -1969,7 +1969,8 @@ function generateBilling(silent=false){
   document.getElementById('billing-totals').innerHTML=`
     <div class="billing-total-item"><div class="billing-total-label">전체 합계</div><div class="billing-total-value" style="color:var(--accent)">${won(tot(currentBilling))}</div></div>
     <div class="billing-total-item"><div class="billing-total-label">알티오라</div><div class="billing-total-value" style="color:var(--altiora)">${won(tot(currentBilling.filter(x=>x.s.brand==='altiora')))}</div></div>
-    <div class="billing-total-item"><div class="billing-total-label">팬그램+페타무스</div><div class="billing-total-value" style="color:var(--petamus)">${won(tot(currentBilling.filter(x=>x.s.brand!=='altiora')))}</div></div>`;
+    <div class="billing-total-item"><div class="billing-total-label">팬그램</div><div class="billing-total-value" style="color:var(--accent)">${won(tot(currentBilling.filter(x=>x.s.brand==='pangram')))}</div></div>
+    <div class="billing-total-item"><div class="billing-total-label">페타무스</div><div class="billing-total-value" style="color:var(--green)">${won(tot(currentBilling.filter(x=>x.s.brand==='petamus')))}</div></div>`;
   document.getElementById('billing-result-card').style.display='block';
   document.getElementById('billing-result-title').textContent=`${year}년 ${month}월 청구 내역`;
   document.getElementById('billing-result-sub').textContent=`활성 ${currentBilling.length}명`;
@@ -2915,6 +2916,29 @@ function onChkMonthChange(){
   toast(ymLabel+' 불러옴 ✓','success',1600);
 }
 
+function toggleAllSpecialChecks(masterCb){
+  const ym = chkGetYM();
+  const store = ensureChkStore(ym);
+  const isChecked = masterCb.checked;
+  const cbs = document.querySelectorAll('#special-list input[type="checkbox"]');
+  cbs.forEach(cb=>{
+    const match = (cb.getAttribute('onchange')||'').match(/toggleChkDone\('(.+?)'\)/);
+    if(!match) return;
+    const key = match[1];
+    if(isChecked){
+      if(!store.done[key]) store.done[key] = Date.now();
+    } else {
+      delete store.done[key];
+    }
+    cb.checked = isChecked;
+  });
+  saveYearData();
+  renderSpecialList();
+  // 렌더 후 마스터 체크박스 상태 복원
+  const master = document.getElementById('special-check-all');
+  if(master) master.checked = isChecked;
+}
+
 function toggleChkDone(key){
   const ym=chkGetYM(); const store=ensureChkStore(ym);
   if(store.done[key]) delete store.done[key]; else store.done[key]=Date.now();
@@ -2960,7 +2984,7 @@ function renderSpecialList(resetTab){
   const el=document.getElementById('special-list');
   if(!items.length){el.innerHTML=titleHtml+`<div class="empty-state"><div style="font-size:28px;margin-bottom:8px;">✅</div><div class="text-muted text-sm">${ymLabel}은 ${chkActiveTab==='all'?'처리할 항목이':'해당 구분의 항목이'} 없습니다</div><div class="text-xs text-muted" style="margin-top:4px;">(이 달은 정상적으로 조회되었습니다)</div></div>`;return;}
   el.innerHTML=titleHtml+`<div class="card" style="padding:0;"><table>
-    <thead><tr><th style="width:44px;">완료</th><th>브랜드</th><th>반</th><th>이름</th><th>구분</th><th>처리 내용</th><th style="width:50px;"></th></tr></thead>
+    <thead><tr><th style="width:44px;"><input type="checkbox" id="special-check-all" onclick="toggleAllSpecialChecks(this)" title="전체 선택/해제" style="width:16px;height:16px;cursor:pointer;"></th><th>브랜드</th><th>반</th><th>이름</th><th>구분</th><th>처리 내용</th><th style="width:50px;"></th></tr></thead>
     <tbody>${items.map(i=>{
       const isDone=!!store.done[i.key];
       const sIdx=S().findIndex(x=>x.id===i.sid);
@@ -3731,7 +3755,8 @@ function updateBillingTotals() {
   document.getElementById('billing-totals').innerHTML = `
     <div class="billing-total-item"><div class="billing-total-label">전체 합계${otTotal?` (+1회성 ${won(otTotal)})`:''}</div><div class="billing-total-value" style="color:var(--accent)">${won(grandTotal)}</div></div>
     <div class="billing-total-item"><div class="billing-total-label">알티오라</div><div class="billing-total-value" style="color:var(--altiora)">${won(tot(currentBilling.filter(x=>x.s.brand==='altiora')))}</div></div>
-    <div class="billing-total-item"><div class="billing-total-label">팬그램+페타무스</div><div class="billing-total-value" style="color:var(--petamus)">${won(tot(currentBilling.filter(x=>x.s.brand!=='altiora')))}</div></div>`;
+    <div class="billing-total-item"><div class="billing-total-label">팬그램</div><div class="billing-total-value" style="color:var(--accent)">${won(tot(currentBilling.filter(x=>x.s.brand==='pangram')))}</div></div>
+    <div class="billing-total-item"><div class="billing-total-label">페타무스</div><div class="billing-total-value" style="color:var(--green)">${won(tot(currentBilling.filter(x=>x.s.brand==='petamus')))}</div></div>`;
 }
 
 // ══════════════════════════════════════════════
