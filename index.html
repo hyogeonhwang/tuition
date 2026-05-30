@@ -189,6 +189,13 @@ tr.inactive td{opacity:.38;}
 .calc-btn.calc-op{background:#fff3e0;color:#e65100;font-weight:700;}
 .calc-btn.calc-eq{background:var(--accent);color:#fff;font-weight:700;}
 .calc-btn.calc-fn{background:var(--surface3,#e8e8f0);color:var(--text2);}
+
+
+
+
+
+
+
 </style>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -252,6 +259,10 @@ tr.inactive td{opacity:.38;}
     <div class="nav-group" id="nav-report">
       <div class="nav-item" onclick="showPage('monthly')"><span class="nav-icon">📋</span>월말 보고</div>
       <div class="nav-item" onclick="showPage('consult')"><span class="nav-icon">📞</span>주간 상담 일지</div>
+    </div>
+    <div class="nav-section" onclick="toggleNavGroup('nav-guide')">업무 가이드<span id="nav-guide-arrow">▸</span></div>
+    <div class="nav-group" id="nav-guide" style="max-height:0;">
+      <div class="nav-item" onclick="showPage('ag-home')"><span class="nav-icon">📋</span>행정 업무 가이드</div>
     </div>
     <div class="nav-section" onclick="toggleNavGroup('nav-settings')">설정<span id="nav-settings-arrow">▸</span></div>
     <div class="nav-group" id="nav-settings" style="max-height:0;">
@@ -515,6 +526,30 @@ tr.inactive td{opacity:.38;}
     </div>
 
     <!-- YEAR END -->
+
+    <div id="ag-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9400;align-items:center;justify-content:center;">
+      <div style="background:var(--surface);border-radius:12px;padding:20px;min-width:300px;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+        <div id="ag-modal-body"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+          <button onclick="AG_closeModal(false)" style="padding:7px 16px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;">취소</button>
+          <button onclick="AG_closeModal(true)" style="padding:7px 16px;border:none;border-radius:6px;background:#1D9E75;color:#fff;cursor:pointer;font-weight:600;">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 업무 가이드 — iframe -->
+    <div class="page" id="page-ag-home" style="padding:0;height:calc(100vh - 60px);">
+      <iframe id="ag-iframe" src="https://hyogeonhwang.github.io/altiora-admin/" 
+        style="width:100%;height:100%;border:none;" 
+        id="ag-iframe">
+      </iframe>
+    </div>
+    <div class="page" id="page-ag-register" style="padding:0;height:calc(100vh - 60px);"></div>
+    <div class="page" id="page-ag-checklist" style="padding:0;height:calc(100vh - 60px);"></div>
+    <div class="page" id="page-ag-payment" style="padding:0;height:calc(100vh - 60px);"></div>
+    <div class="page" id="page-ag-messages" style="padding:0;height:calc(100vh - 60px);"></div>
+    <div class="page" id="page-ag-quickref" style="padding:0;height:calc(100vh - 60px);"></div>
+
     <!-- CALC -->
     <div class="page" id="page-calc">
       <div style="max-width:340px;margin:0 auto;">
@@ -1625,7 +1660,8 @@ const PAGE_TITLES={
   dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
   special:'특이사항 체크', master:'단가 설정', textbook:'외부교재비 설정',
   yearend:'학년도 관리',
-  calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'월말 보고', consult:'주간 상담 일지'
+  calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'월말 보고', consult:'주간 상담 일지',
+  'ag-home':'업무 가이드'
 };
 function showPage(p){
   if(p !== 'consult') detachConsultListener();
@@ -1644,6 +1680,13 @@ function showPage(p){
   if(p==='sms'){ initSmsPage(); renderSmsTemplateList(); }
   if(p==='classconfig') renderClassConfig();
   if(p==='monthly'){ initMonthlySelectors(); renderMonthlyReport(); }
+  if(p === 'ag-home'){
+    // 업무 가이드 — iframe으로 표시
+    const iframe = document.getElementById('ag-iframe');
+    if(iframe && !iframe.src.includes('altiora-admin')){
+      iframe.src = 'https://hyogeonhwang.github.io/altiora-admin/';
+    }
+  }
   if(p==='consult') initConsultPage();
   if(p==='billing'){
     // 이미 생성된 청구서가 없을 때만 복원
@@ -3149,7 +3192,7 @@ function renderMasterContent(tab){
       </td>
     </tr>`;
   }
-  function addBtn(brand, type, label){
+  function AG_addBtn(brand, type, label){
     return `<button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="addFeeItem('${brand}','${type}')">+ ${label} 추가</button>`;
   }
 
@@ -3165,7 +3208,7 @@ function renderMasterContent(tab){
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='altiora'&&v.type==='tuition').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('altiora','tuition','교습비 항목')}
+          ${AG_addBtn('altiora','tuition','교습비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">셔틀비 / 재료비</div>
@@ -3173,14 +3216,14 @@ function renderMasterContent(tab){
             ${Object.entries(fi).filter(([,v])=>v.brand==='altiora'&&v.type==='shuttle').map(([k])=>feeRow(k)).join('')}
             ${Object.entries(fi).filter(([,v])=>v.brand==='altiora'&&v.type==='material').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('altiora','material','재료비 항목')}
+          ${AG_addBtn('altiora','material','재료비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">패키지교재비 <span class="text-xs text-muted">(분기, 반별 조건 적용)</span></div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='altiora'&&v.type==='pkg').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('altiora','pkg','교재비 항목')}
+          ${AG_addBtn('altiora','pkg','교재비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">차감단가 <span class="text-xs text-muted">(htime 자동 적용)</span></div>
@@ -3188,7 +3231,7 @@ function renderMasterContent(tab){
             ${feeRow('alt_d_1510')}${feeRow('alt_d_1620')}
             ${Object.entries(fi).filter(([k])=>k.startsWith('alt_d_')&&k!=='alt_d_1510'&&k!=='alt_d_1620').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('altiora','deduct','차감단가 항목')}
+          ${AG_addBtn('altiora','deduct','차감단가 항목')}
         </div>
       </div>
 `;
@@ -3201,21 +3244,21 @@ function renderMasterContent(tab){
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='pangram'&&v.type==='tuition').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('pangram','tuition','교습비 항목')}
+          ${AG_addBtn('pangram','tuition','교습비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">셔틀비 <span class="text-xs text-muted">(freq 자동 적용, 분기)</span></div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='pangram'&&v.type==='shuttle').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('pangram','shuttle','셔틀비 항목')}
+          ${AG_addBtn('pangram','shuttle','셔틀비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">차감단가 <span class="text-xs text-muted">(freq 자동 적용)</span></div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='pangram'&&v.type==='deduct').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('pangram','deduct','차감단가 항목')}
+          ${AG_addBtn('pangram','deduct','차감단가 항목')}
         </div>
       </div>`;
   } else if(tab==='petamus'){
@@ -3228,28 +3271,28 @@ function renderMasterContent(tab){
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='petamus'&&v.type==='tuition').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('petamus','tuition','교습비 항목')}
+          ${AG_addBtn('petamus','tuition','교습비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">셔틀비 (분기)</div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='petamus'&&v.type==='shuttle').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('petamus','shuttle','셔틀비 항목')}
+          ${AG_addBtn('petamus','shuttle','셔틀비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">과학재료비 / 간식비 (분기)</div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='petamus'&&(v.type==='science'||v.type==='snack')).map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('petamus','snack','간식비 항목')}
+          ${AG_addBtn('petamus','snack','간식비 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">차감단가</div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead><tbody>
             ${Object.entries(fi).filter(([,v])=>v.brand==='petamus'&&v.type==='deduct').map(([k])=>feeRow(k)).join('')}
           </tbody></table>
-          ${addBtn('petamus','deduct','차감단가 항목')}
+          ${AG_addBtn('petamus','deduct','차감단가 항목')}
         </div>
       </div>`;
   } else if(tab==='care'){
@@ -3261,13 +3304,13 @@ function renderMasterContent(tab){
           <div class="card-title" style="margin-bottom:10px;">1:1 수업 단가</div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead>
           <tbody>${otItems.map(([k])=>feeRow(k)).join('')}</tbody></table>
-          ${addBtn('common','onetone','1:1 단가 항목')}
+          ${AG_addBtn('common','onetone','1:1 단가 항목')}
         </div>
         <div class="card">
           <div class="card-title" style="margin-bottom:10px;">1회성 항목 단가 <span class="text-xs text-muted">(입학금·보증금 등)</span></div>
           <table><thead><tr><th>항목</th><th class="text-right">금액</th><th></th></tr></thead>
           <tbody>${Object.entries(fi).filter(([,v])=>v.type==='onetime').map(([k])=>feeRow(k)).join('')}</tbody></table>
-          ${addBtn('common','onetime','1회성 항목')}
+          ${AG_addBtn('common','onetime','1회성 항목')}
         </div>
       </div>`;
   } else {
@@ -4993,6 +5036,7 @@ function expandNavGroupForPage(p){
     billing:'nav-billing', students:'nav-billing', special:'nav-billing',
     monthly:'nav-report', consult:'nav-report',
     master:'nav-settings', textbook:'nav-settings', sms:'nav-settings',
+    'ag-home':'nav-guide',
     classconfig:'nav-settings', yearend:'nav-settings', calc:'nav-settings'
   };
   const groupId = map[p];
@@ -5006,7 +5050,7 @@ function expandNavGroupForPage(p){
 }
 
 function initNavGroups(){
-  ['nav-main','nav-billing','nav-report','nav-settings'].forEach(id=>{
+  ['nav-main','nav-billing','nav-report','nav-guide','nav-settings'].forEach(id=>{
     const el = document.getElementById(id);
     const arrow = document.getElementById(id+'-arrow');
     if(!el) return;
@@ -5273,6 +5317,8 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
 });
 
 init();
+
+// 업무 가이드 — iframe 방식으로 대체
 </script>
 </body>
 </html>
