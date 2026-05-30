@@ -802,7 +802,7 @@ tr.inactive td{opacity:.38;}
     </div>
     <div class="section-label">돌봄 / 1:1</div>
     <div class="form-row">
-      <div class="form-group"><label>돌봄</label><select id="s-care" onchange="updateCareFields()"><option value="없음">없음</option><option value="1회">1회 — 10,000원</option><option value="주3회">주3회 — 120,000원</option><option value="주4회">주4회 — 150,000원</option><option value="주5회">주5회 — 180,000원</option></select></div>
+      <div class="form-group"><label>돌봄</label><select id="s-care" onchange="updateCareFields()"><option value="없음">없음</option><option value="주1회">주1회 — 40,000원</option><option value="주2회">주2회 — 80,000원</option><option value="주3회">주3회 — 120,000원</option><option value="주4회">주4회 — 150,000원</option><option value="주5회">주5회 — 180,000원</option></select></div>
       <div class="form-group" id="s-care-days-group" style="display:none;"><label>돌봄 요일</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
           <label style="display:flex;align-items:center;gap:3px;font-size:13px;cursor:pointer;"><input type="checkbox" class="care-day-check" value="월"> 월</label>
@@ -1222,6 +1222,8 @@ function defaultMaster(){
     },
     care:[
       {label:'1회',key:'care_1',amount:10000},
+      {label:'주1회',key:'care_1w',amount:40000},
+      {label:'주2회',key:'care_2',amount:80000},
       {label:'주3회',key:'care_3',amount:120000},
       {label:'주4회',key:'care_4',amount:150000},
       {label:'주5회',key:'care_5',amount:180000}
@@ -1468,7 +1470,7 @@ function getMaterial(s,month){
 
 function getCare(s){
   const cv=s.care;
-  const map={없음:0,'1회':getAmt(M().care,'care_1'),'주3회':getAmt(M().care,'care_3'),'주4회':getAmt(M().care,'care_4'),'주5회':getAmt(M().care,'care_5')};
+  const map={없음:0,'주1회':getAmt(M().care,'care_1w'),'주2회':getAmt(M().care,'care_2'),'주3회':getAmt(M().care,'care_3'),'주4회':getAmt(M().care,'care_4'),'주5회':getAmt(M().care,'care_5')};
   return map[cv]||0;
 }
 
