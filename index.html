@@ -224,6 +224,39 @@ tr.inactive td{opacity:.38;}
       return snap.exists() ? snap.val() : null;
     }
   </script>
+<script>
+/* 새로고침 시 대시보드가 잠깐 보이는 깜빡임 방지 —
+   첫 페인트 전에 저장된 페이지를 바로 표시 (init()의 showPage가 이후 정상 처리) */
+(function(){
+  try{
+    var saved = localStorage.getItem('current_page');
+    var valid = ['billing','students','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
+    if(saved && valid.indexOf(saved)>=0){
+      var st = document.createElement('style');
+      st.id = '_early-page-style';
+      st.textContent =
+        '#page-dashboard{display:none!important;}' +
+        '#page-'+saved+'{display:block!important;}';
+      document.head.appendChild(st);
+      // 상단 타이틀도 첫 페인트부터 맞춰 깜빡임 방지
+      var TITLES = {billing:'월별 청구 생성', students:'원생 관리', special:'특이사항 체크',
+        monthly:'신규·퇴원 관리', consult:'상담 일지', 'ag-home':'행정 업무 가이드',
+        master:'단가 설정', textbook:'외부교재비 설정', sms:'SMS 템플릿',
+        classconfig:'반 목록 관리', yearend:'학년도 관리', calc:'계산기'};
+      document.addEventListener('DOMContentLoaded', function(){
+        var t = document.getElementById('topbar-title');
+        if(t && TITLES[saved]) t.textContent = TITLES[saved];
+        // 사이드바 active 표시도 미리 이동
+        document.querySelectorAll('.nav-item').forEach(function(e){
+          var oc = e.getAttribute('onclick')||'';
+          if(oc.indexOf("'dashboard'")>=0) e.classList.remove('active');
+          if(oc.indexOf("'"+saved+"'")>=0) e.classList.add('active');
+        });
+      });
+    }
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 
@@ -257,8 +290,8 @@ tr.inactive td{opacity:.38;}
     </div>
     <div class="nav-section" onclick="toggleNavGroup('nav-report')">보고<span id="nav-report-arrow">▾</span></div>
     <div class="nav-group" id="nav-report">
-      <div class="nav-item" onclick="showPage('monthly')"><span class="nav-icon">📋</span>월말 보고</div>
-      <div class="nav-item" onclick="showPage('consult')"><span class="nav-icon">📞</span>주간 상담 일지</div>
+      <div class="nav-item" onclick="showPage('monthly')"><span class="nav-icon">📋</span>신규·퇴원 관리</div>
+      <div class="nav-item" onclick="showPage('consult')"><span class="nav-icon">📞</span>상담 일지</div>
     </div>
     <div class="nav-section" onclick="toggleNavGroup('nav-guide')">업무 가이드<span id="nav-guide-arrow">▸</span></div>
     <div class="nav-group" id="nav-guide" style="max-height:0;">
@@ -279,7 +312,17 @@ tr.inactive td{opacity:.38;}
 
 <div id="main">
   <div class="topbar">
-    <div class="topbar-title" id="topbar-title">대시보드</div>
+    <div class="topbar-title" id="topbar-title"><script>
+      (function(){
+        var sp = '';
+        try{ sp = localStorage.getItem('current_page')||''; }catch(e){}
+        var T = {dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
+          special:'특이사항 체크', monthly:'신규·퇴원 관리', consult:'상담 일지',
+          'ag-home':'행정 업무 가이드', master:'단가 설정', textbook:'외부교재비 설정',
+          sms:'SMS 템플릿', classconfig:'반 목록 관리', yearend:'학년도 관리', calc:'계산기'};
+        document.write(T[sp] || '대시보드');
+      })();
+    </script></div>
     <div class="topbar-right">
       <span class="year-chip" id="topbar-year">2026</span>
       <span class="text-sm text-muted" id="topbar-date"></span>
@@ -588,21 +631,57 @@ tr.inactive td{opacity:.38;}
     <div class="page" id="page-consult">
       <!-- 상단 주차 선택 + 입력 버튼 -->
       <div class="card" style="margin-bottom:14px;">
+        <!-- 1행: 보기 모드 + 주차 네비 -->
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-secondary" onclick="moveConsultWeek(-1)">◀ 이전 주</button>
-          <span id="consult-week-label" style="font-size:14px;font-weight:600;color:var(--text);min-width:220px;text-align:center;"></span>
-          <button class="btn btn-secondary" onclick="moveConsultWeek(1)">다음 주 ▶</button>
-          <button class="btn btn-primary" onclick="setThisWeek()">이번 주</button>
-          <div style="position:relative;margin-left:8px;">
+          <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <button id="consult-mode-week" class="btn" onclick="setConsultMode('week')"
+              style="border:none;border-radius:0;padding:7px 14px;font-size:13px;font-weight:600;background:var(--accent2);color:#fff;cursor:pointer;">주간 조회</button>
+            <button id="consult-mode-all" class="btn" onclick="setConsultMode('all')"
+              style="border:none;border-radius:0;padding:7px 14px;font-size:13px;font-weight:600;background:var(--surface);color:var(--text2);cursor:pointer;">전체 누적</button>
+          </div>
+          <span id="consult-week-nav" style="display:inline-flex;align-items:center;gap:10px;">
+            <button class="btn btn-secondary" onclick="moveConsultWeek(-1)">◀ 이전 주</button>
+            <span id="consult-week-label" style="font-size:14px;font-weight:600;color:var(--text);min-width:220px;text-align:center;"></span>
+            <button class="btn btn-secondary" onclick="moveConsultWeek(1)">다음 주 ▶</button>
+            <button class="btn btn-primary" onclick="setThisWeek()">이번 주</button>
+          </span>
+        </div>
+
+        <!-- 구분선 -->
+        <div style="height:1px;background:var(--border);margin:12px 0;"></div>
+
+        <!-- 2행: 검색 + 필터 (왼쪽) / 상담 입력 (오른쪽) -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div style="position:relative;">
             <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;">🔍</span>
-            <input type="text" id="consult-search" placeholder="이름 검색..."
-              style="padding:6px 24px 6px 28px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:140px;background:var(--surface);"
+            <input type="text" id="consult-search" placeholder="이름·연락처 검색"
+              style="padding:6px 24px 6px 28px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:160px;background:var(--surface);"
               oninput="renderConsultFilter();document.getElementById('consult-search-clear').style.display=this.value?'flex':'none';"
               onkeydown="if(event.key==='Escape'){this.value='';renderConsultFilter();document.getElementById('consult-search-clear').style.display='none';}">
             <span id="consult-search-clear" onclick="document.getElementById('consult-search').value='';renderConsultFilter();this.style.display='none';"
               style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;line-height:1;align-items:center;">✕</span>
           </div>
-          <button class="btn btn-primary" onclick="openConsultModal()" style="background:var(--green);border-color:var(--green);margin-left:8px;">+ 상담 입력</button>
+          <div style="display:inline-flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap;">
+            <span style="font-size:12px;color:var(--text3);font-weight:600;white-space:nowrap;">구분</span>
+            <select id="consult-filter-brand" onchange="renderConsultFilter()"
+              style="width:auto;padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);min-width:100px;flex-shrink:0;">
+              <option value="">전체</option>
+              <option value="알티오라">알티오라</option>
+              <option value="팬그램">팬그램</option>
+              <option value="페타무스">페타무스</option>
+              <option value="캠프">캠프</option>
+            </select>
+          </div>
+          <div style="display:inline-flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap;">
+            <span style="font-size:12px;color:var(--text3);font-weight:600;white-space:nowrap;">수신인</span>
+            <select id="consult-filter-receiver" onchange="renderConsultFilter()"
+              style="width:auto;padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);min-width:110px;max-width:150px;flex-shrink:0;">
+              <option value="">전체</option>
+            </select>
+          </div>
+          <button id="consult-filter-clear" onclick="clearConsultFilters()"
+            style="display:none;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);cursor:pointer;color:var(--text2);">✕ 필터 해제</button>
+          <button class="btn btn-primary" onclick="openConsultModal()" style="background:var(--green);border-color:var(--green);margin-left:auto;">+ 상담 입력</button>
         </div>
       </div>
 
@@ -1618,8 +1697,18 @@ async function init(){
   document.getElementById('sidebar-year').textContent=currentYear+'학년도';
   document.getElementById('topbar-year').textContent=currentYear;
   const ySel=document.getElementById('billing-year');
-  for(let y=2025;y<=2028;y++){const o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===now.getFullYear())o.selected=true;ySel.appendChild(o);}
-  document.getElementById('billing-month').value=now.getMonth()+1;
+  // 기준월 초기값: 마지막으로 조회한 월(last_billing_ym)이 있으면 그걸 사용해
+  // 새로고침 시 현재월(기본값)이 잠깐 보였다 바뀌는 깜빡임 방지
+  let initBillYear = now.getFullYear(), initBillMonth = now.getMonth()+1;
+  try{
+    const lastYm = localStorage.getItem('last_billing_ym');
+    if(lastYm && /^\d{6}$/.test(lastYm)){
+      initBillYear = parseInt(lastYm.slice(0,4));
+      initBillMonth = parseInt(lastYm.slice(4));
+    }
+  }catch(e){}
+  for(let y=2025;y<=2028;y++){const o=document.createElement('option');o.value=y;o.textContent=y+'년';if(y===initBillYear)o.selected=true;ySel.appendChild(o);}
+  document.getElementById('billing-month').value=initBillMonth;
 
   // Firebase에서 데이터 로드
   showLoadingOverlay('Firebase에서 데이터 로딩 중...');
@@ -1637,11 +1726,15 @@ async function init(){
   if(!CY.textbooks||!CY.textbooks.length){CY.textbooks=[];loadSampleTB();}
   if(!CY.tbMaster||!CY.tbMaster.length){CY.tbMaster=[];loadSampleTbMaster();}
   updateClassOptions();updateTbClass();updateStudentClassFilter();
-  renderDashboard();renderStudentTable();renderTextbookTable();renderMasterContent('tuition');renderSpecialList('all');renderArchiveList();
-  // 항상 대시보드로 시작
+  // 새로고침 시 마지막으로 보던 화면 복원 (없으면 대시보드)
+  // — 무거운 렌더 호출보다 먼저 화면을 전환해 대시보드가 잠깐 보이는 깜빡임 방지
   initNavGroups();
-  showPage('dashboard');
-
+  const savedPage = localStorage.getItem('current_page');
+  const validPages = ['dashboard','billing','students','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
+  showPage(validPages.includes(savedPage) ? savedPage : 'dashboard');
+  // 첫 페인트용 임시 스타일 제거 (이후 화면 전환이 정상 동작하도록)
+  document.getElementById('_early-page-style')?.remove();
+  renderDashboard();renderStudentTable();renderTextbookTable();renderMasterContent('tuition');renderSpecialList('all');renderArchiveList();
 }
 
 function loadSample(){
@@ -1660,7 +1753,7 @@ const PAGE_TITLES={
   dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
   special:'특이사항 체크', master:'단가 설정', textbook:'외부교재비 설정',
   yearend:'학년도 관리',
-  calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'월말 보고', consult:'주간 상담 일지',
+  calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'신규·퇴원 관리', consult:'상담 일지',
   'ag-home':'업무 가이드'
 };
 function showPage(p){
@@ -1864,7 +1957,7 @@ function renderDashboard(viewMonth){
       <span style="min-width:20px;font-size:12px;font-weight:700;color:var(--accent2);">${day}</span>
       ${unique.map(s=>`<span onclick="openStudentModal(S().findIndex(x=>x.id==='${s.id}'))"
         style="background:var(--accent-dim);color:var(--accent2);border-radius:5px;
-        padding:2px 7px;font-size:12px;cursor:pointer;">${s.name}</span>`).join('')}
+        padding:2px 7px;font-size:12px;cursor:pointer;">${s.name}${s.ename?`<span style="opacity:.65;font-size:11px;margin-left:3px;">${s.ename}</span>`:''}</span>`).join('')}
     </div>`;
   }).filter(Boolean).join('') || `<div class="text-muted text-sm">없음</div>`;
 
@@ -1890,7 +1983,7 @@ function renderDashboard(viewMonth){
       <span style="min-width:20px;font-size:12px;font-weight:700;color:${color};">${day}</span>
       ${unique.map(s=>`<span onclick="openStudentModal(S().findIndex(x=>x.id==='${s.id}'))"
         style="background:${bg};color:${color};border-radius:5px;
-        padding:2px 7px;font-size:12px;cursor:pointer;" title="${s.cls}">${s.name}</span>`).join('')}
+        padding:2px 7px;font-size:12px;cursor:pointer;" title="${s.cls}">${s.name}${s.ename?`<span style="opacity:.65;font-size:11px;margin-left:3px;">${s.ename}</span>`:''}</span>`).join('')}
     </div>`;
   }).filter(Boolean).join('') || `<div class="text-muted text-sm">없음</div>`;
 }
@@ -1968,8 +2061,11 @@ function generateBilling(silent=false){
   const year=parseInt(document.getElementById('billing-year').value);
   const month=parseInt(document.getElementById('billing-month').value);
   currentBillingMonth=month;
-  billingOverrides = {}; // 청구 재생성 시 수기 수정 초기화
   const ym = String(year)+String(month).padStart(2,'0');
+  // 저장된 수기 수정값 복원 (없으면 빈 객체) — 청구서 재생성해도 수정값 유지
+  billingOverrides = CY.billings?.[ym]?.overrides
+    ? JSON.parse(JSON.stringify(CY.billings[ym].overrides))
+    : {};
   localStorage.setItem('last_billing_ym', ym);
   const isQ=isQM(month),isS=isSM(month);
 
@@ -2562,11 +2658,13 @@ function buildStudentRow(s){
          ${s.leaveMonth?`<div style="font-size:10px;color:var(--text3);margin-top:2px;">${s.leaveMonth.replace(/-/g,'.')}</div>`:''}
          ${s.leaveReason?`<div style="font-size:11px;color:var(--text2);margin-top:2px;max-width:160px;">${s.leaveReason}</div>`:''}`
     }</td>
-    <td><div style="display:flex;gap:4px;">
+    <td><div style="display:flex;gap:4px;align-items:center;">
       <button class="btn btn-secondary btn-sm" onclick="openStudentModal(${idx})">수정</button>
       ${s.active
         ? `<button class="btn btn-danger btn-sm" onclick="openStudentModal(${idx})" title="모달에서 퇴원일 입력">퇴원</button>`
         : `<button class="btn btn-success btn-sm" onclick="openAndClearLeave(${idx})" title="퇴원일 삭제 후 복구">복구</button>`}
+      <button class="btn btn-sm" onclick="deleteStudent(${idx})" title="원생 완전 삭제 (복구 불가)"
+        style="background:none;border:1px solid var(--red);color:var(--red);font-weight:600;margin-left:2px;">삭제</button>
     </div></td>`;
   return tr;
 }
@@ -2819,6 +2917,30 @@ function openAndClearLeave(idx){
     renderDashboard();
     toast(`${s.name} 원생이 복구되었습니다.`, 'success');
   });
+}
+
+// 원생 완전 삭제 — 잘못 등록한 원생 제거용 (id 기준, 복구 불가)
+function deleteStudent(idx){
+  const s = S()[idx];
+  if(!s) return;
+  showConfirm(`⚠️ "${s.name}" 원생을 완전히 삭제합니다.
+
+· 퇴원이 아니라 데이터에서 영구 제거됩니다.
+· 과거 청구 내역·기록에서도 사라집니다.
+· 복구할 수 없습니다.
+
+실제로 그만둔 원생은 삭제가 아니라 "퇴원" 처리하세요.
+정말 삭제하시겠습니까?`, ()=>{
+    // S()는 정렬·필터된 뷰이므로 반드시 id 기준으로 원본에서 제거
+    const realIdx = CY.students.findIndex(x=>x.id===s.id);
+    if(realIdx < 0){ toast('대상 원생을 찾지 못했습니다.', 'warn'); return; }
+    CY.students.splice(realIdx, 1);
+    saveYearData();
+    renderStudentTable();
+    renderDashboard();
+    renderSpecialList('all');
+    toast(`${s.name} 원생이 삭제되었습니다.`, 'warn');
+  }, '원생 삭제', '삭제');
 }
 
 // 엑셀 서식 다운로드
@@ -4419,7 +4541,7 @@ function addFeeItem(brand, type){
 
 
 // ══════════════════════════════════════════════
-// MONTHLY REPORT — 월말 보고
+// MONTHLY REPORT — 신규·퇴원 관리
 // ══════════════════════════════════════════════
 function initMonthlySelectors(){
   const ySel = document.getElementById('monthly-year');
@@ -4569,7 +4691,7 @@ function renderMonthlyReport(){
 
 
 // ══════════════════════════════════════════════
-// CONSULT — 주간 상담 일지
+// CONSULT — 상담 일지
 // ══════════════════════════════════════════════
 let consultEditId = null;
 let consultRows = []; // 현재 조회된 전체 행 (검색 필터링용)
@@ -4603,6 +4725,27 @@ function getCurrentWeek(){
 
 // 현재 조회 중인 주의 월요일 (Date 객체)
 let consultMonday = null;
+// 보기 모드: 'week'(주간) | 'all'(전체 누적)
+let consultViewMode = localStorage.getItem('consult_view_mode') || 'week';
+
+function setConsultMode(mode){
+  consultViewMode = mode;
+  localStorage.setItem('consult_view_mode', mode);
+  // 토글 버튼 스타일
+  const wBtn = document.getElementById('consult-mode-week');
+  const aBtn = document.getElementById('consult-mode-all');
+  const nav  = document.getElementById('consult-week-nav');
+  if(mode==='week'){
+    if(wBtn){ wBtn.style.background='var(--accent2)'; wBtn.style.color='#fff'; }
+    if(aBtn){ aBtn.style.background='var(--surface)'; aBtn.style.color='var(--text2)'; }
+    if(nav) nav.style.display='inline-flex';
+  } else {
+    if(aBtn){ aBtn.style.background='var(--accent2)'; aBtn.style.color='#fff'; }
+    if(wBtn){ wBtn.style.background='var(--surface)'; wBtn.style.color='var(--text2)'; }
+    if(nav) nav.style.display='none';
+  }
+  renderConsultPage();
+}
 
 function getMonday(d){
   const day = d.getDay()||7;
@@ -4629,7 +4772,7 @@ function moveConsultWeek(delta){
 
 function initConsultPage(){
   if(!consultMonday) consultMonday = getMonday(new Date());
-  renderConsultPage();
+  setConsultMode(consultViewMode); // 저장된 모드로 UI 동기화 + 렌더
 }
 
 // 실시간 리스너 참조 — 탭 이탈 시 해제용
@@ -4645,6 +4788,24 @@ function detachConsultListener(){
 }
 
 function renderConsultPage(){
+  detachConsultListener();
+
+  if(consultViewMode==='all'){
+    // 전체 누적 모드 — 범위 없이 전체 로드, 최신순 정렬
+    const ref = firebase.database().ref('consult').orderByChild('date');
+    consultListenerRef = ref;
+    consultListener = ref.on('value', snap=>{
+      const rows = [];
+      snap.forEach(c=>{ rows.push({id:c.key, ...c.val()}); });
+      rows.sort((a,b)=> a.date < b.date ? 1 : a.date > b.date ? -1 : 0); // 최신순
+      consultRows = rows;
+      renderConsultFilter();
+      renderConsultSummary(rows, '전체 누적', true);
+    });
+    return;
+  }
+
+  // 주간 모드
   if(!consultMonday) consultMonday = getMonday(new Date());
   const mon = new Date(consultMonday);
   const fri = new Date(mon); fri.setDate(mon.getDate() + 4);
@@ -4657,8 +4818,6 @@ function renderConsultPage(){
   const labelEl = document.getElementById('consult-week-label');
   if(labelEl) labelEl.textContent = lbl;
 
-  // 기존 리스너 해제 후 새로 등록
-  detachConsultListener();
   const ref = firebase.database().ref('consult')
     .orderByChild('date').startAt(monStr).endAt(sunStr+'\uffff');
   consultListenerRef = ref;
@@ -4669,22 +4828,51 @@ function renderConsultPage(){
     rows.sort((a,b)=> a.date > b.date ? 1 : a.date < b.date ? -1 : 0);
     consultRows = rows;
     renderConsultFilter();
-    renderConsultSummary(rows, lbl);
+    renderConsultSummary(rows, lbl, false);
   });
 }
 
 function renderConsultFilter(){
+  // 수신인 드롭다운 옵션을 현재 조회 데이터 기준으로 채움 (선택값 보존)
+  const recSel = document.getElementById('consult-filter-receiver');
+  if(recSel){
+    const cur = recSel.value;
+    const names = [...new Set(consultRows.map(r=>(r.receiver||'').trim()).filter(Boolean))].sort();
+    recSel.innerHTML = '<option value="">전체</option>' +
+      names.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join('');
+    // 기존 선택값이 목록에 여전히 있으면 유지
+    recSel.value = names.includes(cur) ? cur : '';
+  }
+
   const q = (document.getElementById('consult-search')?.value||'').trim();
-  const filtered = q
-    ? consultRows.filter(r=>(r.name||'').includes(q)||(r.phone||'').includes(q))
-    : consultRows;
+  const fBrand = document.getElementById('consult-filter-brand')?.value||'';
+  const fRecv  = document.getElementById('consult-filter-receiver')?.value||'';
+
+  // 필터 활성 시 '필터 해제' 버튼 표시
+  const clr = document.getElementById('consult-filter-clear');
+  if(clr) clr.style.display = (q||fBrand||fRecv) ? 'inline-flex' : 'none';
+
+  let filtered = consultRows;
+  if(q)      filtered = filtered.filter(r=>(r.name||'').includes(q)||(r.phone||'').includes(q));
+  if(fBrand) filtered = filtered.filter(r=>(r.brand||'')===fBrand);
+  if(fRecv)  filtered = filtered.filter(r=>(r.receiver||'').trim()===fRecv);
+
   renderConsultTable(filtered);
+}
+
+function clearConsultFilters(){
+  const s = document.getElementById('consult-search');     if(s) s.value='';
+  const b = document.getElementById('consult-filter-brand'); if(b) b.value='';
+  const r = document.getElementById('consult-filter-receiver'); if(r) r.value='';
+  const sc = document.getElementById('consult-search-clear'); if(sc) sc.style.display='none';
+  renderConsultFilter();
 }
 
 function renderConsultTable(rows){
   const tbody = document.getElementById('consult-tbody');
   if(!rows.length){
-    tbody.innerHTML = '<tr><td colspan="13"><div class="empty-state text-muted text-sm">이번 주 상담 내역 없음</div></td></tr>';
+    const msg = consultViewMode==='all' ? '상담 내역 없음' : '이번 주 상담 내역 없음';
+    tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state text-muted text-sm">${msg}</div></td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map((r,i)=>`
@@ -4706,7 +4894,7 @@ function renderConsultTable(rows){
     </tr>`).join('');
 }
 
-function renderConsultSummary(rows, lbl){
+function renderConsultSummary(rows, lbl, isAll){
   const total = rows.length;
   const count = arr => arr.reduce((a,v)=>{ a[v]=(a[v]||0)+1; return a; },{});
 
@@ -4731,8 +4919,8 @@ function renderConsultSummary(rows, lbl){
   document.getElementById('consult-summary').innerHTML = `
     <div class="card" style="border-left:4px solid var(--accent2);">
       <div style="font-size:14px;font-weight:700;margin-bottom:12px;">
-        📊 ${lbl} 주간 보고 <span style="color:var(--accent2);margin-left:8px;">총 ${total}건</span>
-        ${meetCount?`<span style="color:var(--green);font-size:12px;margin-left:8px;">대면상담 ${meetCount}건 예정</span>`:''}
+        📊 ${lbl} ${isAll?'보고':'주간 보고'} <span style="color:var(--accent2);margin-left:8px;">총 ${total}건</span>
+        ${meetCount?`<span style="color:var(--green);font-size:12px;margin-left:8px;">대면상담 ${meetCount}건${isAll?'':' 예정'}</span>`:''}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
         <div>
@@ -5009,13 +5197,37 @@ function saveBillingOverride(sid, field, origAmt){
   billingOverrides[sid][field] = { amount: newAmt, memo, origAmt };
   document.getElementById('billing-override-popup')?.remove();
   renderBillingTable();
-  toast(`${S().find(x=>x.id===sid)?.name} ${field} 금액 수정됨`, 'success', 2000);
+  persistOverrides();
+  toast(`${S().find(x=>x.id===sid)?.name} ${field} 금액 수정됨 (저장완료)`, 'success', 2000);
 }
 
 function clearBillingOverride(sid, field){
-  if(billingOverrides[sid]) delete billingOverrides[sid][field];
+  if(billingOverrides[sid]){
+    delete billingOverrides[sid][field];
+    if(Object.keys(billingOverrides[sid]).length===0) delete billingOverrides[sid];
+  }
   document.getElementById('billing-override-popup')?.remove();
   renderBillingTable();
+  persistOverrides();
+  toast('수기 수정 원복됨', 'success', 1500);
+}
+
+// 현재 청구월의 수기 수정값(billingOverrides)을 해당 월 billings에 저장
+function persistOverrides(){
+  const year=parseInt(document.getElementById('billing-year').value);
+  const month=parseInt(document.getElementById('billing-month').value);
+  if(!year||!month) return;
+  const ym = String(year)+String(month).padStart(2,'0');
+  if(!CY.billings) CY.billings={};
+  if(!CY.billings[ym]) CY.billings[ym]={};
+  // 빈 객체는 저장하지 않고 키 자체를 제거 (깔끔하게)
+  if(Object.keys(billingOverrides).length){
+    CY.billings[ym].overrides = JSON.parse(JSON.stringify(billingOverrides));
+  } else {
+    delete CY.billings[ym].overrides;
+  }
+  saveYearData();
+  fbSave('data_'+CY.year+'/billings', CY.billings).catch(e=>console.warn('overrides 저장 실패:',e));
 }
 // ── /청구 수기 금액 수정 ──
 
