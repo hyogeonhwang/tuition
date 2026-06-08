@@ -1570,6 +1570,24 @@ const M=()=>CY.master;
 const S=()=>CY.students||[];
 const TB=()=>CY.textbooks||[];
 
+// 반 목록 관리 순서 기준 정렬 — 브랜드 순서 → 반 순서(CLASSES 인덱스) → 이름 가나다
+const BRAND_ORDER = {altiora:0, pangram:1, petamus:2};
+function classRank(brand, cls){
+  const arr = (CLASSES && CLASSES[brand]) || [];
+  const i = arr.indexOf(cls);
+  return i < 0 ? 9999 : i; // 목록에 없는 반은 맨 뒤
+}
+function cmpClassOrder(a,b){
+  const br = (BRAND_ORDER[a.brand]??9) - (BRAND_ORDER[b.brand]??9);
+  if(br) return br;
+  const cr = classRank(a.brand,a.cls) - classRank(b.brand,b.cls);
+  if(cr) return cr;
+  return (a.name||'').localeCompare(b.name||'', 'ko');
+}
+function sortByClassOrder(list){
+  return list.slice().sort(cmpClassOrder);
+}
+
 function getAmt(arr,key){const i=arr.find(x=>x.key===key);return i?i.amount:0;}
 function isQM(m){return[2,5,8,11].includes(m);}
 function isSM(m){return[2,8].includes(m);}
@@ -2362,7 +2380,7 @@ function renderBillingTable(){
     if(billingFilters.item==='onetone' && !a.onetone) return false;
     if(billingFilters.item==='split' && !s.split) return false;
     return true;
-  });
+  }).sort((x,y)=>cmpClassOrder(x.s, y.s));
   const hasShuttle=isQ,hasPkg=isQ,hasExtTB=isQ;
   // 알티오라 재료비: 반기, 페타무스 과학재료비+간식비: 분기
   const hasMat=isS;   // 알티오라 재료비
@@ -2558,7 +2576,7 @@ function renderStudentTable(){
   const cf=document.getElementById('sf-class')?.value||'';
   const sf=document.getElementById('sf-status')?.value||'active';
   const spf=document.getElementById('sf-special')?.value||'';
-  const list=S().filter(s=>{
+  let list=S().filter(s=>{
     if(sf==='active'&&!s.active)return false;
     if(sf==='inactive'&&s.active)return false;
     if(bf&&s.brand!==bf)return false;
@@ -2573,6 +2591,7 @@ function renderStudentTable(){
 
     return true;
   });
+  list = sortByClassOrder(list);
   const tbody=document.getElementById('student-tbody');
   if(!list.length){tbody.innerHTML=`<tr><td colspan="11"><div class="empty-state text-muted text-sm">원생 없음</div></td></tr>`;return;}
 
@@ -4053,13 +4072,57 @@ function renderClassConfig() {
       </div>
       <div id="cls-list-${b}">
         ${CLASSES[b].map((cls,i) => `
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);">
+          <div class="cls-row" draggable="true" data-cbrand="${b}" data-cidx="${i}"
+            style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);">
+            <span class="cls-drag" style="cursor:grab;color:var(--text3);font-size:16px;user-select:none;" title="드래그하여 순서 변경">⠿</span>
             <span style="flex:1;font-size:13px;">${cls}</span>
             <button class="btn btn-secondary btn-sm" onclick="openEditClass('${b}',${i})">수정</button>
             <button class="btn btn-danger btn-sm" onclick="deleteClass('${b}',${i})">삭제</button>
           </div>`).join('')}
       </div>
     </div>`).join('');
+  setupClassDrag();
+}
+
+// 반 목록 드래그 순서 변경 (같은 브랜드 안에서만)
+let _clsDragBrand=null, _clsDragFrom=-1;
+function setupClassDrag(){
+  document.querySelectorAll('#classconfig-content .cls-row').forEach(row=>{
+    row.addEventListener('dragstart', e=>{
+      _clsDragBrand = row.dataset.cbrand;
+      _clsDragFrom = parseInt(row.dataset.cidx);
+      e.dataTransfer.effectAllowed='move';
+      row.style.opacity='.4';
+    });
+    row.addEventListener('dragend', ()=>{ row.style.opacity=''; });
+    row.addEventListener('dragover', e=>{
+      if(_clsDragBrand===row.dataset.cbrand){ e.preventDefault(); e.dataTransfer.dropEffect='move'; }
+    });
+    row.addEventListener('drop', e=>{
+      if(_clsDragBrand!==row.dataset.cbrand) return;
+      e.preventDefault();
+      const to = parseInt(row.dataset.cidx);
+      moveClass(_clsDragBrand, _clsDragFrom, to);
+      _clsDragBrand=null; _clsDragFrom=-1;
+    });
+  });
+}
+function moveClass(brand, from, to){
+  if(from<0||to<0||from===to) return;
+  const arr = CLASSES[brand];
+  if(!arr||from>=arr.length||to>=arr.length) return;
+  const moved = arr.splice(from,1)[0];
+  arr.splice(to,0,moved);
+  saveClasses();
+  renderClassConfig();
+  // 순서 변경이 모든 화면에 반영되도록 갱신
+  updateStudentClassFilter?.();
+  updateBillingClassFilter?.();
+  updateTbClass?.();
+  renderStudentTable();
+  renderDashboard();
+  if(currentBilling.length) renderBillingTable();
+  toast(`${BRANDS[brand].name} 반 순서가 변경되었습니다.`, 'success', 1500);
 }
 
 function openAddClass(brand) {
