@@ -229,7 +229,7 @@ tr.inactive td{opacity:.38;}
    첫 페인트 전에 저장된 페이지를 바로 표시 (init()의 showPage가 이후 정상 처리) */
 (function(){
   try{
-    var saved = localStorage.getItem('current_page');
+    var saved = sessionStorage.getItem('current_page');
     var valid = ['billing','students','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
     if(saved && valid.indexOf(saved)>=0){
       var st = document.createElement('style');
@@ -315,7 +315,7 @@ tr.inactive td{opacity:.38;}
     <div class="topbar-title" id="topbar-title"><script>
       (function(){
         var sp = '';
-        try{ sp = localStorage.getItem('current_page')||''; }catch(e){}
+        try{ sp = sessionStorage.getItem('current_page')||''; }catch(e){}
         var T = {dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
           special:'특이사항 체크', monthly:'신규·퇴원 관리', consult:'상담 일지',
           'ag-home':'행정 업무 가이드', master:'단가 설정', textbook:'외부교재비 설정',
@@ -1747,7 +1747,7 @@ async function init(){
   // 새로고침 시 마지막으로 보던 화면 복원 (없으면 대시보드)
   // — 무거운 렌더 호출보다 먼저 화면을 전환해 대시보드가 잠깐 보이는 깜빡임 방지
   initNavGroups();
-  const savedPage = localStorage.getItem('current_page');
+  const savedPage = sessionStorage.getItem('current_page');
   const validPages = ['dashboard','billing','students','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
   showPage(validPages.includes(savedPage) ? savedPage : 'dashboard');
   // 첫 페인트용 임시 스타일 제거 (이후 화면 전환이 정상 동작하도록)
@@ -1782,7 +1782,7 @@ function showPage(p){
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(e=>{if((e.getAttribute('onclick')||'').includes("'"+p+"'"))e.classList.add('active');});
   document.getElementById('topbar-title').textContent=PAGE_TITLES[p]||p;
-  localStorage.setItem('current_page', p);
+  sessionStorage.setItem('current_page', p);
   if(p==='dashboard')renderDashboard();
   if(p==='students')renderStudentTable();
   if(p==='special')renderSpecialList('all');
