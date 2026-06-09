@@ -2085,6 +2085,10 @@ function ovDiff(s, a){
   Object.entries(ov).forEach(([field,o])=>{ diff += (o.amount - (a[field]||0)); });
   return diff;
 }
+// 학생별 추가비용(1회성) 합 — onetimeRows에서 직접 계산 (otRowMap 갱신 타이밍과 무관)
+function otAmtOf(sid){
+  return (onetimeRows||[]).filter(r=>r.sid===sid).reduce((sum,r)=>sum+(r.amount||0),0);
+}
 let otRowMap = {}; // 전역 — renderBillingTable에서 갱신, showExtraItemsPopup에서 참조
 // 차감 데이터: { studentId: {days, rate, amount, reason, memo} }
 let deductions={};
@@ -2176,7 +2180,7 @@ function generateBilling(silent=false){
     // Firebase에 billings만 별도 저장
     fbSave('data_'+CY.year+'/billings', CY.billings).catch(e=>console.warn('billings 저장 실패:',e));
   }
-  const tot=arr=>arr.reduce((a,b)=>a+b.a.total-(deductions[b.s.id]?.amount||0)+ovDiff(b.s,b.a),0);
+  const tot=arr=>arr.reduce((a,b)=>a+b.a.total-(deductions[b.s.id]?.amount||0)+ovDiff(b.s,b.a)+otAmtOf(b.s.id),0);
   document.getElementById('billing-totals').style.display='grid';
   document.getElementById('billing-totals').innerHTML=`
     <div class="billing-total-item"><div class="billing-total-label">전체 합계</div><div class="billing-total-value" style="color:var(--accent)">${won(tot(currentBilling))}</div></div>
@@ -2550,9 +2554,10 @@ function renderBillingTable(){
   }).join('');
   const ct={};
   rows.forEach(({s,a})=>{
-    if(!ct[s.cls]) ct[s.cls]={brand:s.brand,count:0,total:0,tuition:0,shuttle:0,textbook_pkg:0,ext_textbook:0,material:0,science:0,snack:0,care:0,onetone:0};
+    if(!ct[s.cls]) ct[s.cls]={brand:s.brand,count:0,total:0,tuition:0,shuttle:0,textbook_pkg:0,ext_textbook:0,material:0,science:0,snack:0,care:0,onetone:0,ot:0};
     const deduct = deductions[s.id]?.amount||0;
     const otAmt = (otRowMap[s.id]||[]).reduce((sum,r)=>sum+(r.amount||0),0);
+    ct[s.cls].ot += otAmt;
     // 수기 수정(override) 반영 — 각 항목별 실제 청구액 = override 있으면 그 값, 없으면 원본
     const ov = billingOverrides[s.id]||{};
     const eff = (field)=> (ov[field]!=null ? ov[field].amount : (a[field]||0));
@@ -2581,7 +2586,7 @@ function renderBillingTable(){
   const grandSci = Object.values(ct).reduce((s,v)=>s+v.science,0);
   const grandSnack = Object.values(ct).reduce((s,v)=>s+v.snack,0);
   const grandCare = Object.values(ct).reduce((s,v)=>s+v.care,0);
-  const grandOT = Object.values(otRowMap).flat().reduce((a,r)=>a+(r.amount||0),0);
+  const grandOT = Object.values(ct).reduce((s,v)=>s+(v.ot||0),0);
   const totalCount = Object.values(ct).reduce((s,v)=>s+v.count,0);
 
   const subtitleStyle = 'background:var(--surface2);font-weight:700;font-size:12px;color:var(--text2);padding:8px 12px;text-align:right;border-top:2px solid var(--border);';
@@ -4032,7 +4037,7 @@ function closeDeductModal() {
 }
 
 function updateBillingTotals() {
-  const tot = arr => arr.reduce((a,b) => a + b.a.total - (deductions[b.s.id]?.amount||0) + ovDiff(b.s,b.a), 0);
+  const tot = arr => arr.reduce((a,b) => a + b.a.total - (deductions[b.s.id]?.amount||0) + ovDiff(b.s,b.a) + otAmtOf(b.s.id), 0);
   const otTotal = getOnetimeTotal();
   const grandTotal = tot(currentBilling) + otTotal;
   document.getElementById('billing-totals').innerHTML = `
