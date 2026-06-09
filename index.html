@@ -214,8 +214,11 @@ tr.inactive td{opacity:.38;}
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     }
 
+    // 내가 저장한 변경인지 구분하기 위한 플래그 (실시간 변경 알림 배너용)
+    window._selfWriteUntil = 0;
     // Firebase 저장
     async function fbSave(path, data){
+      window._selfWriteUntil = Date.now() + 4000; // 저장 후 4초간은 내 변경으로 간주
       await db.ref(path).set(data);
     }
     // Firebase 읽기
@@ -1081,6 +1084,7 @@ tr.inactive td{opacity:.38;}
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeDeductModal()">취소</button>
+      <button class="btn btn-secondary" onclick="clearTuitionOverride()" id="tuition-override-clear" style="display:none;color:var(--red);border-color:var(--red);">수기 원복</button>
       <button class="btn btn-secondary" onclick="applyTuitionOverride()" id="tuition-override-btn">수기금액 적용</button>
       <button class="btn btn-danger" onclick="applyDeduct()">차감 적용</button>
     </div>
@@ -1451,6 +1455,45 @@ function saveYearData(){
   // Firebase 저장
   fbSave('data_'+CY.year, CY).catch(e=>console.warn('Firebase 저장 실패:',e));
 }
+
+// ── 실시간 변경 알림 (청구·원생 등 data_{year}) ──
+let _syncWatchRef = null;
+let _syncInitialSkip = true;
+function setupSyncWatch(year){
+  // 기존 리스너 해제
+  if(_syncWatchRef){ try{ _syncWatchRef.off(); }catch(e){} }
+  _syncInitialSkip = true;
+  const ref = firebase.database().ref('data_'+year);
+  _syncWatchRef = ref;
+  ref.on('value', ()=>{
+    // 최초 1회(현재 데이터 로드분)는 무시
+    if(_syncInitialSkip){ _syncInitialSkip = false; return; }
+    // 내가 방금 저장한 변경이면 무시
+    if(Date.now() < (window._selfWriteUntil||0)) return;
+    // 다른 기기에서 변경됨 → 배너 표시 (화면은 자동으로 안 바꿈)
+    showSyncBanner();
+  });
+}
+
+function showSyncBanner(){
+  if(document.getElementById('sync-banner')) return; // 이미 떠 있으면 중복 방지
+  const bar = document.createElement('div');
+  bar.id = 'sync-banner';
+  bar.style.cssText = `position:fixed;top:0;left:0;right:0;z-index:9999;
+    background:var(--accent2);color:#fff;padding:10px 16px;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.15);`;
+  bar.innerHTML = `
+    <span>🔄 다른 기기에서 데이터가 변경되었습니다.</span>
+    <button onclick="location.reload()"
+      style="background:#fff;color:var(--accent2);border:none;border-radius:6px;
+      padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;">최신 데이터 불러오기</button>
+    <button onclick="document.getElementById('sync-banner')?.remove()"
+      style="background:none;border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:6px;
+      padding:5px 10px;font-size:12px;cursor:pointer;">나중에</button>`;
+  document.body.appendChild(bar);
+}
+
 async function loadYearDataFromFB(y){
   try {
     const data = await fbGet('data_'+y);
@@ -1557,6 +1600,7 @@ async function switchYear(y){
   showLoadingOverlay('데이터 로딩 중...');
   CY = await loadYearDataFromFB(y);
   localStorage.setItem(getYearKey(y), JSON.stringify(CY));
+  setupSyncWatch(y);
   hideLoadingOverlay();
   document.getElementById('sidebar-year').textContent=y+'학년도';
   document.getElementById('topbar-year').textContent=y;
@@ -1739,6 +1783,7 @@ async function init(){
     // preview 자동삭제 코드 제거 (1:1 분기납 로직 완전 제거됨)
   } catch(e){ console.warn('Firebase 로드 실패:', e); }
   hideLoadingOverlay();
+  setupSyncWatch(currentYear);
 
   if(!CY.students||!CY.students.length){CY.students=[];loadSample();}
   if(!CY.textbooks||!CY.textbooks.length){CY.textbooks=[];loadSampleTB();}
@@ -2033,6 +2078,13 @@ function toggleAccordion(idx){
 // ══════════════════════════════════════════════
 let currentBilling=[],currentBillingMonth=0;
 let billingOverrides = {}; // {sid: {field: {amount, memo}}} — 수기 금액 수정
+// 한 학생의 수기 수정 차액 합 (override금액 - 원본금액)
+function ovDiff(s, a){
+  const ov = billingOverrides[s.id]||{};
+  let diff = 0;
+  Object.entries(ov).forEach(([field,o])=>{ diff += (o.amount - (a[field]||0)); });
+  return diff;
+}
 let otRowMap = {}; // 전역 — renderBillingTable에서 갱신, showExtraItemsPopup에서 참조
 // 차감 데이터: { studentId: {days, rate, amount, reason, memo} }
 let deductions={};
@@ -2117,7 +2169,7 @@ function generateBilling(silent=false){
     // Firebase에 billings만 별도 저장
     fbSave('data_'+CY.year+'/billings', CY.billings).catch(e=>console.warn('billings 저장 실패:',e));
   }
-  const tot=arr=>arr.reduce((a,b)=>a+b.a.total-(deductions[b.s.id]?.amount||0),0);
+  const tot=arr=>arr.reduce((a,b)=>a+b.a.total-(deductions[b.s.id]?.amount||0)+ovDiff(b.s,b.a),0);
   document.getElementById('billing-totals').style.display='grid';
   document.getElementById('billing-totals').innerHTML=`
     <div class="billing-total-item"><div class="billing-total-label">전체 합계</div><div class="billing-total-value" style="color:var(--accent)">${won(tot(currentBilling))}</div></div>
@@ -2433,10 +2485,11 @@ function renderBillingTable(){
             const netTuition = displayTuition - deductAmt;
             const hasDeduct = effectiveSibling>0 || deductAmt>0;
             const tuitionOv = billingOverrides[s.id]?.['tuition'];
+            const tuitionOrig = hasDeduct?netTuition:displayTuition;
             if(tuitionOv){
               return `<span style="color:var(--red);font-weight:700;text-decoration:underline dotted;"
                 title="${tuitionOv.memo?'수기수정: '+tuitionOv.memo:'수기수정'}">${won(tuitionOv.amount)}</span>
-                <div style="font-size:10px;color:var(--text3);">원 ${won(hasDeduct?netTuition:displayTuition)}</div>
+                <div style="font-size:10px;color:var(--text3);">원 ${won(tuitionOrig)}</div>
                 ${deductAmt?`<div class="amount-breakdown" style="color:var(--red);">${deductions[s.id].reason} -${won(deductAmt)}<span onclick="event.stopPropagation();clearDeduct('${s.id}')" style="margin-left:4px;cursor:pointer;font-size:11px;">✕</span></div>`:''}`;
             }
             return hasDeduct
@@ -2492,17 +2545,24 @@ function renderBillingTable(){
   rows.forEach(({s,a})=>{
     if(!ct[s.cls]) ct[s.cls]={brand:s.brand,count:0,total:0,tuition:0,shuttle:0,textbook_pkg:0,ext_textbook:0,material:0,science:0,snack:0,care:0,onetone:0};
     const deduct = deductions[s.id]?.amount||0;
+    const otAmt = (otRowMap[s.id]||[]).reduce((sum,r)=>sum+(r.amount||0),0);
+    // 수기 수정(override) 반영 — 각 항목별 실제 청구액 = override 있으면 그 값, 없으면 원본
+    const ov = billingOverrides[s.id]||{};
+    const eff = (field)=> (ov[field]!=null ? ov[field].amount : (a[field]||0));
+    let overrideDiff = 0;
+    Object.entries(ov).forEach(([field,o])=>{ overrideDiff += (o.amount - (a[field]||0)); });
+    const effSibCancel = deduct>0 ? (a.sibling||0) : 0;
     ct[s.cls].count++;
-    ct[s.cls].total += a.total - deduct;
-    ct[s.cls].tuition += a.tuition;
-    ct[s.cls].shuttle += a.shuttle||0;
-    ct[s.cls].textbook_pkg += a.textbook_pkg||0;
-    ct[s.cls].ext_textbook += a.ext_textbook||0;
-    ct[s.cls].material += (a.material_alt||0);
-    ct[s.cls].science += a.science||0;
-    ct[s.cls].snack += a.snack||0;
-    ct[s.cls].care += a.care||0;
-    ct[s.cls].onetone += a.onetone||0;
+    ct[s.cls].total += a.total - deduct + effSibCancel + otAmt + overrideDiff;
+    ct[s.cls].tuition += eff('tuition');
+    ct[s.cls].shuttle += eff('shuttle');
+    ct[s.cls].textbook_pkg += eff('textbook_pkg');
+    ct[s.cls].ext_textbook += eff('ext_textbook');
+    ct[s.cls].material += (ov['material_alt']!=null ? ov['material_alt'].amount : (a.material_alt||0));
+    ct[s.cls].science += eff('science');
+    ct[s.cls].snack += eff('snack');
+    ct[s.cls].care += eff('care');
+    ct[s.cls].onetone += eff('onetone');
   });
   // 테이블 하단에 구분별 소계 행 추가
   const grandTotal = Object.values(ct).reduce((s,v)=>s+v.total,0);
@@ -3886,6 +3946,9 @@ function openDeductModal(sid) {
   const tuitionOv = billingOverrides[sid]?.['tuition'];
   document.getElementById('tuition-override-amount').value = tuitionOv ? tuitionOv.amount : '';
   document.getElementById('tuition-override-memo').value = tuitionOv ? tuitionOv.memo : '';
+  // 수기수정이 걸려 있을 때만 '수기 원복' 버튼 표시
+  const clrBtn = document.getElementById('tuition-override-clear');
+  if(clrBtn) clrBtn.style.display = tuitionOv ? 'inline-flex' : 'none';
   calcDeductPreview();
   document.getElementById('modal-deduct').classList.add('open');
 }
@@ -3928,10 +3991,25 @@ function applyTuitionOverride(){
   if(!billingOverrides[sid]) billingOverrides[sid]={};
   const item = currentBilling.find(x=>x.s.id===sid);
   billingOverrides[sid]['tuition'] = { amount:amt, memo, origAmt: item?.a?.tuition||0 };
+  persistOverrides();
   closeModal('modal-deduct');
   renderBillingTable();
   updateBillingTotals();
-  toast(`교습비 수기 ${won(amt)} 적용됨`,'success');
+  toast(`교습비 수기 ${won(amt)} 적용됨 (저장완료)`,'success');
+}
+
+// 교습비 수기수정 원복
+function clearTuitionOverride(){
+  const sid = deductTargetId;
+  if(billingOverrides[sid]){
+    delete billingOverrides[sid]['tuition'];
+    if(Object.keys(billingOverrides[sid]).length===0) delete billingOverrides[sid];
+  }
+  persistOverrides();
+  closeModal('modal-deduct');
+  renderBillingTable();
+  updateBillingTotals();
+  toast('교습비 수기수정 원복됨','success',1500);
 }
 
 function clearDeduct(sid) {
@@ -3945,7 +4023,7 @@ function closeDeductModal() {
 }
 
 function updateBillingTotals() {
-  const tot = arr => arr.reduce((a,b) => a + b.a.total - (deductions[b.s.id]?.amount||0), 0);
+  const tot = arr => arr.reduce((a,b) => a + b.a.total - (deductions[b.s.id]?.amount||0) + ovDiff(b.s,b.a), 0);
   const otTotal = getOnetimeTotal();
   const grandTotal = tot(currentBilling) + otTotal;
   document.getElementById('billing-totals').innerHTML = `
@@ -5259,8 +5337,8 @@ function saveBillingOverride(sid, field, origAmt){
   if(!billingOverrides[sid]) billingOverrides[sid] = {};
   billingOverrides[sid][field] = { amount: newAmt, memo, origAmt };
   document.getElementById('billing-override-popup')?.remove();
-  renderBillingTable();
   persistOverrides();
+  renderBillingTable();
   toast(`${S().find(x=>x.id===sid)?.name} ${field} 금액 수정됨 (저장완료)`, 'success', 2000);
 }
 
@@ -5270,8 +5348,8 @@ function clearBillingOverride(sid, field){
     if(Object.keys(billingOverrides[sid]).length===0) delete billingOverrides[sid];
   }
   document.getElementById('billing-override-popup')?.remove();
-  renderBillingTable();
   persistOverrides();
+  renderBillingTable();
   toast('수기 수정 원복됨', 'success', 1500);
 }
 
