@@ -2136,6 +2136,13 @@ function generateBilling(silent=false){
   billingOverrides = CY.billings?.[ym]?.overrides
     ? JSON.parse(JSON.stringify(CY.billings[ym].overrides))
     : {};
+  // 저장된 추가비용·차감 복원
+  onetimeRows = CY.billings?.[ym]?.onetimeRows
+    ? JSON.parse(JSON.stringify(CY.billings[ym].onetimeRows))
+    : [];
+  deductions = CY.billings?.[ym]?.deductions
+    ? JSON.parse(JSON.stringify(CY.billings[ym].deductions))
+    : {};
   localStorage.setItem('last_billing_ym', ym);
   const isQ=isQM(month),isS=isSM(month);
 
@@ -2147,7 +2154,7 @@ function generateBilling(silent=false){
     document.getElementById('btn-close-billing').style.display='none';
   } else if(CY.billings?.[ym]?.preview){
     // 저장된 임시 결과 복원 (원생 데이터 기준으로 재계산)
-    deductions={}; onetimeRows=[]; renderOnetimeRows();
+    renderOnetimeRows();
     document.getElementById('billing-type-tags').innerHTML=`
     <span class="tag tag-blue">월 교습비</span>
     ${isQ?`<span class="tag tag-yellow">분기(${qNum(month)}분기) — 셔틀·교재비</span>`:''}
@@ -2155,7 +2162,7 @@ function generateBilling(silent=false){
     currentBilling=S().filter(s=>s.active).map(s=>({s,a:calcBilling(s,month)}));
   } else {
     // 마감 전 — 항상 현재 설정으로 새로 계산
-    deductions={}; onetimeRows=[]; renderOnetimeRows();
+    renderOnetimeRows();
   document.getElementById('billing-type-tags').innerHTML=`
     <span class="tag tag-blue">월 교습비</span>
     ${isQ?`<span class="tag tag-yellow">분기(${qNum(month)}분기) — 셔틀·교재비</span>`:''}
@@ -3975,6 +3982,7 @@ function applyDeduct() {
   const reason = document.getElementById('deduct-reason').value;
   const memo = document.getElementById('deduct-memo').value;
   deductions[deductTargetId] = { days, rate, amount, reason, memo };
+  persistOverrides();
   closeModal('modal-deduct');
   renderBillingTable();
   updateBillingTotals();
@@ -4014,6 +4022,7 @@ function clearTuitionOverride(){
 
 function clearDeduct(sid) {
   delete deductions[sid];
+  persistOverrides();
   renderBillingTable();
   updateBillingTotals();
 }
@@ -4390,6 +4399,7 @@ function getOtAmt(months){
 
 function addOnetimeRow(sid='', item='AR비용', amount=0) {
   onetimeRows.push({id:'ot'+Date.now()+Math.random(), sid, item, amount});
+  persistOverrides();
   renderOnetimeRows();
 }
 
@@ -4409,6 +4419,7 @@ function autoFillOnetimeAmt(id, item){
 }
 function removeOnetimeRow(id) {
   onetimeRows = onetimeRows.filter(r=>r.id!==id);
+  persistOverrides();
   renderOnetimeRows();
   updateBillingTotals();
   // + 버튼 팝업 재렌더
@@ -4461,7 +4472,7 @@ function renderOnetimeRows() {
 
 function updateOnetimeRow(id, field, val) {
   const row = onetimeRows.find(r=>r.id===id);
-  if(row){ row[field]=val; renderOnetimeRows(); updateBillingTotals(); }
+  if(row){ row[field]=val; persistOverrides(); renderOnetimeRows(); updateBillingTotals(); }
 }
 
 function getOnetimeTotal() {
@@ -5367,8 +5378,20 @@ function persistOverrides(){
   } else {
     delete CY.billings[ym].overrides;
   }
+  // 추가비용(1회성) 저장
+  if(onetimeRows && onetimeRows.length){
+    CY.billings[ym].onetimeRows = JSON.parse(JSON.stringify(onetimeRows));
+  } else {
+    delete CY.billings[ym].onetimeRows;
+  }
+  // 차감 저장
+  if(deductions && Object.keys(deductions).length){
+    CY.billings[ym].deductions = JSON.parse(JSON.stringify(deductions));
+  } else {
+    delete CY.billings[ym].deductions;
+  }
   saveYearData();
-  fbSave('data_'+CY.year+'/billings', CY.billings).catch(e=>console.warn('overrides 저장 실패:',e));
+  fbSave('data_'+CY.year+'/billings', CY.billings).catch(e=>console.warn('billings 저장 실패:',e));
 }
 // ── /청구 수기 금액 수정 ──
 
@@ -5464,6 +5487,7 @@ function initNavGroups(){
 // ── 행별 추가비용 + 버튼 팝업 ──
 let _rowMenuSid = null;
 let _rowMenuBtn = null;
+let _rowMenuCloseFn = null;
 
 function showExtraItemsPopup(sid, el) {
   const existing = document.getElementById('extra-items-popup');
@@ -5601,15 +5625,18 @@ function toggleRowAddMenu(sid, btn) {
   popup.style.top = top + 'px';
   popup.style.left = left + 'px';
 
-  // 외부 클릭 닫기
+  // 외부 클릭 닫기 (전역 참조로 보관 — rowAddCustom에서 제거 가능하게)
   setTimeout(()=>{
-    document.addEventListener('click', function _close(e){
-      if(!popup.contains(e.target) && e.target !== btn){
-        popup.remove();
+    _rowMenuCloseFn = function(e){
+      const pop = document.getElementById('row-add-popup');
+      if(pop && !pop.contains(e.target) && e.target !== btn){
+        pop.remove();
         _rowMenuSid = null;
-        document.removeEventListener('click', _close);
+        document.removeEventListener('click', _rowMenuCloseFn);
+        _rowMenuCloseFn = null;
       }
-    });
+    };
+    document.addEventListener('click', _rowMenuCloseFn);
   }, 0);
 }
 
@@ -5622,17 +5649,45 @@ function rowAddItem(sid, item, amount) {
 }
 
 function rowAddCustom(sid) {
+  const s = S().find(x=>x.id===sid);
+  if(!s) return;
+  const popup = document.getElementById('row-add-popup');
+  if(!popup) return;
+  // 외부 클릭 닫기 리스너 제거 (폼 입력 중 닫히지 않도록)
+  if(_rowMenuCloseFn){ document.removeEventListener('click', _rowMenuCloseFn); _rowMenuCloseFn = null; }
+  // 팝업 안에 직접 입력 폼을 인라인으로 표시 (별도 섹션에 의존하지 않음)
+  popup.innerHTML = `
+    <div style="font-size:11px;font-weight:600;color:var(--text3);padding:2px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:6px;">
+      ${s.name} — 직접 입력
+    </div>
+    <div style="padding:0 8px 4px;">
+      <input id="custom-ot-item" type="text" placeholder="항목명 (예: AR비용)"
+        style="width:100%;font-size:12px;padding:6px 8px;margin-bottom:6px;box-sizing:border-box;">
+      <input id="custom-ot-amount" type="number" min="0" step="10000" placeholder="금액"
+        style="width:100%;font-size:12px;padding:6px 8px;margin-bottom:8px;box-sizing:border-box;">
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="document.getElementById('row-add-popup')?.remove();_rowMenuSid=null;">취소</button>
+        <button class="btn btn-primary btn-sm" style="flex:1;" onclick="rowAddCustomConfirm('${sid}')">추가</button>
+      </div>
+    </div>
+  `;
+  setTimeout(()=>{ document.getElementById('custom-ot-item')?.focus(); }, 0);
+  // 엔터로 추가
+  const amtEl = document.getElementById('custom-ot-amount');
+  if(amtEl) amtEl.addEventListener('keydown', e=>{ if(e.key==='Enter') rowAddCustomConfirm(sid); });
+}
+
+function rowAddCustomConfirm(sid) {
+  const itemEl = document.getElementById('custom-ot-item');
+  const amtEl = document.getElementById('custom-ot-amount');
+  const item = (itemEl?.value||'').trim() || '기타';
+  const amount = parseInt(amtEl?.value) || 0;
+  addOnetimeRow(sid, item, amount);
   const popup = document.getElementById('row-add-popup');
   if(popup) popup.remove();
   _rowMenuSid = null;
-  const s = S().find(x=>x.id===sid);
-  if(!s) return;
-  // 1회성 섹션에 원생 지정해서 빈 행 추가
-  addOnetimeRow(sid, '기타', 0);
-  // 1회성 섹션으로 스크롤
-  const el = document.getElementById('onetime-section');
-  if(el) el.scrollIntoView({behavior:'smooth', block:'nearest'});
-  toast(`${s.name} — 기타 항목 추가. 아래 금액을 입력해주세요.`, 'info', 3500);
+  renderBillingTable();
+  toast(`${S().find(x=>x.id===sid)?.name} — ${item} ${won(amount)} 추가됨`);
 }
 // ── /행별 추가비용 + 버튼 팝업 ──
 
