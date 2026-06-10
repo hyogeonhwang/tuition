@@ -2089,6 +2089,28 @@ function ovDiff(s, a){
 function otAmtOf(sid){
   return (onetimeRows||[]).filter(r=>r.sid===sid).reduce((sum,r)=>sum+(r.amount||0),0);
 }
+// 교습비 실제 청구액 — 셀 표시와 합계가 똑같이 쓰는 단일 기준
+// override > (차감/형제할인 반영) 순. 셀 표시 로직(2490대)과 반드시 동일하게 유지.
+function effTuition(s, a){
+  const deductAmt = deductions[s.id]?.amount||0;
+  const effectiveSibling = deductAmt > 0 ? 0 : (a.sibling||0);
+  const baseTuition = (a.tuition||0) + (a.sibling||0);
+  const displayTuition = baseTuition - effectiveSibling;
+  const netTuition = displayTuition - deductAmt;
+  const hasDeduct = effectiveSibling>0 || deductAmt>0;
+  const tuitionOv = billingOverrides[s.id]?.['tuition'];
+  if(tuitionOv) return tuitionOv.amount;
+  return hasDeduct ? netTuition : displayTuition;
+}
+// 학생 1명의 최종 청구액 — 교습비(effTuition) + 나머지(override 반영) + 추가비용
+function effGrandTotal(s, a){
+  const ov = billingOverrides[s.id]||{};
+  const eff = (f)=> (ov[f]!=null ? ov[f].amount : (a[f]||0));
+  const rest = eff('shuttle') + eff('textbook_pkg') + eff('ext_textbook')
+    + (ov['material_alt']!=null ? ov['material_alt'].amount : (a.material_alt||0))
+    + eff('science') + eff('snack') + eff('care') + eff('onetone');
+  return effTuition(s, a) + rest + otAmtOf(s.id);
+}
 let otRowMap = {}; // 전역 — renderBillingTable에서 갱신, showExtraItemsPopup에서 참조
 // 차감 데이터: { studentId: {days, rate, amount, reason, memo} }
 let deductions={};
@@ -2180,7 +2202,7 @@ function generateBilling(silent=false){
     // Firebase에 billings만 별도 저장
     fbSave('data_'+CY.year+'/billings', CY.billings).catch(e=>console.warn('billings 저장 실패:',e));
   }
-  const tot=arr=>arr.reduce((a,b)=>a+b.a.total-(deductions[b.s.id]?.amount||0)+ovDiff(b.s,b.a)+otAmtOf(b.s.id),0);
+  const tot=arr=>arr.reduce((a,b)=>a+effGrandTotal(b.s,b.a),0);
   document.getElementById('billing-totals').style.display='grid';
   document.getElementById('billing-totals').innerHTML=`
     <div class="billing-total-item"><div class="billing-total-label">전체 합계</div><div class="billing-total-value" style="color:var(--accent)">${won(tot(currentBilling))}</div></div>
@@ -2528,18 +2550,7 @@ function renderBillingTable(){
       })()}</td>`:''}
 
       <td class="mono text-right amount-total">${(()=>{
-        const d = deductions[s.id]?.amount||0;
-        const effSib = d>0 ? 0 : (a.sibling||0);
-        const cancelledSib = d>0 ? (a.sibling||0) : 0;
-        const otAmt = (otRowMap[s.id]||[]).reduce((sum,r)=>sum+(r.amount||0),0);
-        // override 적용 — 수정된 항목은 차이만큼 가감
-        const ov = billingOverrides[s.id]||{};
-        let overrideDiff = 0;
-        Object.entries(ov).forEach(([field,o])=>{
-          const orig = a[field]||0;
-          overrideDiff += (o.amount - orig);
-        });
-        return won(a.total - d + cancelledSib + otAmt + overrideDiff);
+        return won(effGrandTotal(s, a));
       })()}</td>
       <td style="white-space:nowrap;">${flags.join(' ')}</td>
       <td style="text-align:center;position:relative;">
@@ -2561,12 +2572,11 @@ function renderBillingTable(){
     // 수기 수정(override) 반영 — 각 항목별 실제 청구액 = override 있으면 그 값, 없으면 원본
     const ov = billingOverrides[s.id]||{};
     const eff = (field)=> (ov[field]!=null ? ov[field].amount : (a[field]||0));
-    let overrideDiff = 0;
-    Object.entries(ov).forEach(([field,o])=>{ overrideDiff += (o.amount - (a[field]||0)); });
-    const effSibCancel = deduct>0 ? (a.sibling||0) : 0;
+    // 교습비는 차감·형제할인까지 반영하는 effTuition 사용 (다른 항목은 override만)
+    const effTu = effTuition(s, a);
     ct[s.cls].count++;
-    ct[s.cls].total += a.total - deduct + effSibCancel + otAmt + overrideDiff;
-    ct[s.cls].tuition += eff('tuition');
+    ct[s.cls].total += effGrandTotal(s, a);
+    ct[s.cls].tuition += effTu;
     ct[s.cls].shuttle += eff('shuttle');
     ct[s.cls].textbook_pkg += eff('textbook_pkg');
     ct[s.cls].ext_textbook += eff('ext_textbook');
@@ -4037,7 +4047,7 @@ function closeDeductModal() {
 }
 
 function updateBillingTotals() {
-  const tot = arr => arr.reduce((a,b) => a + b.a.total - (deductions[b.s.id]?.amount||0) + ovDiff(b.s,b.a) + otAmtOf(b.s.id), 0);
+  const tot = arr => arr.reduce((a,b) => a + effGrandTotal(b.s,b.a), 0);
   const otTotal = getOnetimeTotal();
   const grandTotal = tot(currentBilling) + otTotal;
   document.getElementById('billing-totals').innerHTML = `
