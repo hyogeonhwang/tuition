@@ -289,6 +289,7 @@ tr.inactive td{opacity:.38;}
     <div class="nav-group" id="nav-billing">
       <div class="nav-item" onclick="showPage('billing')"><span class="nav-icon">🧾</span>월별 청구 생성</div>
       <div class="nav-item" onclick="showPage('students')"><span class="nav-icon">👦</span>원생 관리</div>
+      <div class="nav-item" onclick="showPage('spotcare')"><span class="nav-icon">🧸</span>일시돌봄 기록</div>
       <div class="nav-item" onclick="showPage('special')"><span class="nav-icon">⚠️</span>특이사항 체크</div>
     </div>
     <div class="nav-section" onclick="toggleNavGroup('nav-report')">보고<span id="nav-report-arrow">▾</span></div>
@@ -468,6 +469,42 @@ tr.inactive td{opacity:.38;}
             <tbody id="student-tbody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- 일시돌봄 -->
+    <div class="page" id="page-spotcare">
+      <div style="max-width:880px;">
+      <div class="info-box">🧸 일시돌봄(회당 10,000원)을 날짜별로 기록하세요. 월말 청구 시 자동으로 "일시돌봄 N회"가 추가비용에 반영됩니다.</div>
+      <div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <label style="font-size:13px;font-weight:600;">날짜</label>
+          <input type="date" id="spotcare-date" style="font-size:14px;padding:6px 10px;">
+          <div style="position:relative;">
+            <input type="text" id="spotcare-search" autocomplete="off" placeholder="학생 이름 검색..."
+              oninput="filterSpotCareStudents()" onfocus="filterSpotCareStudents()"
+              style="font-size:14px;padding:6px 10px;min-width:220px;">
+            <input type="hidden" id="spotcare-student">
+            <div id="spotcare-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;
+              background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;margin-top:2px;
+              max-height:240px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.12);"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addSpotCare()">+ 일시돌봄 추가</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:14px;align-items:start;">
+        <div class="card">
+          <div class="card-title" style="margin-bottom:10px;">이번 달 학생별 합계</div>
+          <div id="spotcare-summary"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;">
+            <div class="card-title" id="spotcare-month-label" style="white-space:nowrap;">이번 달 기록</div>
+            <input type="month" id="spotcare-month" onchange="renderSpotCare()" style="font-size:13px;padding:5px 8px;">
+          </div>
+          <div id="spotcare-list"></div>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -1505,6 +1542,8 @@ async function loadYearDataFromFB(y){
         data.textbooks = Object.values(data.textbooks);
       if(data.tbMaster && !Array.isArray(data.tbMaster))
         data.tbMaster = Object.values(data.tbMaster);
+      if(data.spotCare && !Array.isArray(data.spotCare))
+        data.spotCare = Object.values(data.spotCare);
       // freq 마이그레이션: 'kelpie' → '3'
       (data.students||[]).forEach(st=>{ if(st.freq==='kelpie') st.freq='3'; });
       // care 마이그레이션: '1회' → '주1회' (1회성 옵션 제거로 인한 보정)
@@ -1814,6 +1853,7 @@ function loadSampleTB(){
 }
 const PAGE_TITLES={
   dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
+  spotcare:'일시돌봄 기록',
   special:'특이사항 체크', master:'단가 설정', textbook:'외부교재비 설정',
   yearend:'학년도 관리',
   calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'신규·퇴원 관리', consult:'상담 일지',
@@ -1830,6 +1870,7 @@ function showPage(p){
   sessionStorage.setItem('current_page', p);
   if(p==='dashboard')renderDashboard();
   if(p==='students')renderStudentTable();
+  if(p==='spotcare')initSpotCarePage();
   if(p==='special')renderSpecialList('all');
   if(p==='textbook')renderTextbookTable();
   if(p==='yearend')renderArchiveList();
@@ -2089,6 +2130,157 @@ function ovDiff(s, a){
 function otAmtOf(sid){
   return (onetimeRows||[]).filter(r=>r.sid===sid).reduce((sum,r)=>sum+(r.amount||0),0);
 }
+
+// ── 일시돌봄 (회당 10,000원 고정) ──
+const SPOT_CARE_FEE = 10000;
+function initSpotCarePage(){
+  // 날짜 기본값 = 오늘(KST)
+  const d = kstNow();
+  const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const dateEl = document.getElementById('spotcare-date');
+  if(dateEl && !dateEl.value) dateEl.value = todayStr;
+  const monthEl = document.getElementById('spotcare-month');
+  if(monthEl && !monthEl.value) monthEl.value = todayStr.slice(0,7);
+  // 검색 입력 초기화
+  const sch = document.getElementById('spotcare-search');
+  const hid = document.getElementById('spotcare-student');
+  if(sch) sch.value = '';
+  if(hid) hid.value = '';
+  // 바깥 클릭 시 자동완성 닫기 (한 번만 등록)
+  if(!window._spotcareOutsideBound){
+    window._spotcareOutsideBound = true;
+    document.addEventListener('click', function(e){
+      const box = document.getElementById('spotcare-suggest');
+      const sc = document.getElementById('spotcare-search');
+      if(box && box.style.display!=='none' && !box.contains(e.target) && e.target!==sc){
+        box.style.display='none';
+      }
+    });
+  }
+  renderSpotCare();
+}
+
+// 학생 검색 자동완성
+function filterSpotCareStudents(){
+  const sch = document.getElementById('spotcare-search');
+  const box = document.getElementById('spotcare-suggest');
+  if(!sch || !box) return;
+  const q = (sch.value||'').trim().toLowerCase();
+  // 입력값이 바뀌면 기존 선택 해제
+  document.getElementById('spotcare-student').value = '';
+  const list = sortByClassOrder(S()).filter(s=>{
+    if(!q) return true;
+    return (s.name||'').toLowerCase().includes(q)
+      || (s.ename||'').toLowerCase().includes(q)
+      || (s.cls||'').toLowerCase().includes(q);
+  }).slice(0, 30);
+  if(!list.length){
+    box.innerHTML = '<div style="padding:8px 12px;color:var(--text3);font-size:13px;">검색 결과 없음</div>';
+    box.style.display = 'block';
+    return;
+  }
+  box.innerHTML = list.map(s=>`
+    <div onclick="selectSpotCareStudent('${s.id}')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <strong>${s.name}</strong>${s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''}
+      <span style="color:var(--text3);font-size:11px;">· ${s.cls}</span>
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function selectSpotCareStudent(sid){
+  const s = S().find(x=>x.id===sid);
+  if(!s) return;
+  document.getElementById('spotcare-student').value = sid;
+  document.getElementById('spotcare-search').value = `${s.name}${s.ename?' ('+s.ename+')':''} · ${s.cls}`;
+  const box = document.getElementById('spotcare-suggest');
+  if(box) box.style.display = 'none';
+}
+function addSpotCare(){
+  const date = document.getElementById('spotcare-date')?.value;
+  const sid = document.getElementById('spotcare-student')?.value;
+  if(!date){ toast('날짜를 선택하세요.','warn'); return; }
+  if(!sid){ toast('학생을 선택하세요.','warn'); return; }
+  if(!CY.spotCare) CY.spotCare = [];
+  CY.spotCare.push({ id:'sc'+Date.now()+Math.random().toString(36).slice(2,6), date, sid });
+  saveYearData();
+  renderSpotCare();
+  const nm = S().find(x=>x.id===sid)?.name||'';
+  toast(`${date} ${nm} 일시돌봄 기록됨`,'success',1500);
+  // 다음 입력을 위해 학생 검색 초기화 (날짜는 유지)
+  const sch = document.getElementById('spotcare-search');
+  const hid = document.getElementById('spotcare-student');
+  const box = document.getElementById('spotcare-suggest');
+  if(sch) sch.value = '';
+  if(hid) hid.value = '';
+  if(box) box.style.display = 'none';
+  if(sch) sch.focus();
+}
+function removeSpotCare(id){
+  if(!CY.spotCare) return;
+  CY.spotCare = CY.spotCare.filter(r=>r.id!==id);
+  saveYearData();
+  renderSpotCare();
+}
+function renderSpotCare(){
+  const monthEl = document.getElementById('spotcare-month');
+  const ym = monthEl?.value || ''; // 'YYYY-MM'
+  const all = CY.spotCare || [];
+  const rows = all.filter(r=> ym ? r.date.slice(0,7)===ym : true)
+    .sort((a,b)=> b.date.localeCompare(a.date));
+  // 학생별 합계
+  const byStudent = {};
+  rows.forEach(r=>{ byStudent[r.sid] = (byStudent[r.sid]||0)+1; });
+  const summaryEl = document.getElementById('spotcare-summary');
+  if(summaryEl){
+    const entries = Object.entries(byStudent);
+    if(!entries.length){
+      summaryEl.innerHTML = '<div style="color:var(--text3);font-size:13px;">이번 달 일시돌봄 기록이 없습니다.</div>';
+    } else {
+      let totalCnt=0;
+      const items = entries.map(([sid,cnt])=>{
+        totalCnt+=cnt;
+        const s = S().find(x=>x.id===sid);
+        return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:13px;">${s?s.name:sid}${s&&s.cls?` <span style="color:var(--text3);font-size:11px;">${s.cls}</span>`:''}</span>
+          <span style="font-size:13px;font-weight:600;">${cnt}회 · ${won(cnt*SPOT_CARE_FEE)}</span>
+        </div>`;
+      }).join('');
+      summaryEl.innerHTML = items +
+        `<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-weight:700;color:var(--accent2);">
+          <span>합계 ${totalCnt}회</span><span>${won(totalCnt*SPOT_CARE_FEE)}</span></div>`;
+    }
+  }
+  // 날짜별 리스트
+  const listEl = document.getElementById('spotcare-list');
+  if(listEl){
+    if(!rows.length){
+      listEl.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0;">기록 없음</div>';
+    } else {
+      listEl.innerHTML = rows.map(r=>{
+        const s = S().find(x=>x.id===r.sid);
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--border);">
+          <div style="font-size:13px;"><span style="color:var(--text3);">${r.date}</span> &nbsp; <strong>${s?s.name:r.sid}</strong>${s&&s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''} ${s&&s.cls?`<span style="color:var(--text3);font-size:11px;">· ${s.cls}</span>`:''}</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:var(--text2);">${won(SPOT_CARE_FEE)}</span>
+            <button class="btn btn-sm" style="border:1px solid var(--red);color:var(--red);" onclick="removeSpotCare('${r.id}')">삭제</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+  const lbl = document.getElementById('spotcare-month-label');
+  if(lbl && ym) lbl.textContent = `${ym.slice(0,4)}년 ${parseInt(ym.slice(5,7))}월 기록`;
+}
+// 특정 월(YYYYMM)의 학생별 일시돌봄 횟수 맵
+function spotCareCountForMonth(ym6){
+  const ym = ym6.slice(0,4)+'-'+ym6.slice(4,6); // YYYY-MM
+  const map = {};
+  (CY.spotCare||[]).forEach(r=>{
+    if(r.date.slice(0,7)===ym) map[r.sid]=(map[r.sid]||0)+1;
+  });
+  return map;
+}
 // 교습비 실제 청구액 — 셀 표시와 합계가 똑같이 쓰는 단일 기준
 // override > (차감/형제할인 반영) 순. 셀 표시 로직(2490대)과 반드시 동일하게 유지.
 function effTuition(s, a){
@@ -2166,6 +2358,12 @@ function generateBilling(silent=false){
   onetimeRows = CY.billings?.[ym]?.onetimeRows
     ? JSON.parse(JSON.stringify(CY.billings[ym].onetimeRows))
     : [];
+  // 일시돌봄 자동 반영: 기존 자동항목(_spot) 제거 후, 이 달 일시돌봄을 학생별로 다시 추가
+  onetimeRows = onetimeRows.filter(r=>!r._spot);
+  const spotMap = spotCareCountForMonth(ym);
+  Object.entries(spotMap).forEach(([sid,cnt])=>{
+    onetimeRows.push({ id:'spot_'+ym+'_'+sid, sid, item:`일시돌봄 ${cnt}회`, amount:cnt*SPOT_CARE_FEE, _spot:true });
+  });
   deductions = CY.billings?.[ym]?.deductions
     ? JSON.parse(JSON.stringify(CY.billings[ym].deductions))
     : {};
@@ -5393,9 +5591,10 @@ function persistOverrides(){
   } else {
     delete CY.billings[ym].overrides;
   }
-  // 추가비용(1회성) 저장
-  if(onetimeRows && onetimeRows.length){
-    CY.billings[ym].onetimeRows = JSON.parse(JSON.stringify(onetimeRows));
+  // 추가비용(1회성) 저장 — 일시돌봄 자동항목(_spot)은 제외(CY.spotCare가 원본)
+  const manualOt = (onetimeRows||[]).filter(r=>!r._spot);
+  if(manualOt.length){
+    CY.billings[ym].onetimeRows = JSON.parse(JSON.stringify(manualOt));
   } else {
     delete CY.billings[ym].onetimeRows;
   }
@@ -5526,23 +5725,26 @@ function showExtraItemsPopup(sid, el) {
   `;
 
   popup.innerHTML = `
-    <div style="font-size:11px;font-weight:600;color:var(--text3);padding:2px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:4px;">
-      ${s.name} 추가비용 항목
+    <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:600;color:var(--text3);padding:2px 4px 6px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+      <span>${s.name} 추가비용 항목</span>
+      <span onclick="document.getElementById('extra-items-popup')?.remove()" style="cursor:pointer;color:var(--text3);font-size:15px;line-height:1;padding:0 4px;" title="닫기">✕</span>
     </div>
     ${items.map(r=>`
       <div style="display:flex;align-items:center;justify-content:space-between;
         padding:6px 8px;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border);">
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.item}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.item}${r._spot?' <span style="color:var(--text3);font-size:10px;">(일시돌봄 메뉴)</span>':''}</span>
         <span style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px;">
           <span class="mono" style="color:var(--accent2);font-weight:700;">${won(r.amount)}</span>
-          <span onclick="event.stopPropagation();removeOnetimeRow('${r.id}')"
-            style="cursor:pointer;color:var(--red);font-size:13px;line-height:1;" title="삭제">✕</span>
+          ${r._spot
+            ? ''
+            : `<span onclick="event.stopPropagation();removeOnetimeRow('${r.id}')" class="btn btn-sm" style="border:1px solid var(--red);color:var(--red);font-size:11px;padding:1px 6px;cursor:pointer;" title="이 항목 삭제">삭제</span>`}
         </span>
       </div>`).join('')}
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px 2px;font-size:12px;">
       <span style="color:var(--text3);">합계</span>
       <span class="mono" style="font-weight:700;color:var(--accent2);">${won(items.reduce((a,r)=>a+(r.amount||0),0))}</span>
     </div>
+    ${items.some(r=>r._spot) ? `<div style="font-size:10px;color:var(--text3);padding:4px 8px 2px;border-top:1px dashed var(--border);margin-top:2px;">※ 일시돌봄은 「일시돌봄 기록」 메뉴에서 수정/삭제됩니다.</div>` : ''}
   `;
 
   document.body.appendChild(popup);
