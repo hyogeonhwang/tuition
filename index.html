@@ -233,7 +233,7 @@ tr.inactive td{opacity:.38;}
 (function(){
   try{
     var saved = sessionStorage.getItem('current_page');
-    var valid = ['billing','students','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
+    var valid = ['billing','students','spotcare','refund','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
     if(saved && valid.indexOf(saved)>=0){
       var st = document.createElement('style');
       st.id = '_early-page-style';
@@ -242,7 +242,7 @@ tr.inactive td{opacity:.38;}
         '#page-'+saved+'{display:block!important;}';
       document.head.appendChild(st);
       // 상단 타이틀도 첫 페인트부터 맞춰 깜빡임 방지
-      var TITLES = {billing:'월별 청구 생성', students:'원생 관리', special:'특이사항 체크',
+      var TITLES = {billing:'월별 청구 생성', students:'원생 관리', spotcare:'일시돌봄 기록', refund:'환불 관리', special:'특이사항 체크',
         monthly:'신규·퇴원 관리', consult:'상담 일지', 'ag-home':'행정 업무 가이드',
         master:'단가 설정', textbook:'외부교재비 설정', sms:'SMS 템플릿',
         classconfig:'반 목록 관리', yearend:'학년도 관리', calc:'계산기'};
@@ -290,6 +290,7 @@ tr.inactive td{opacity:.38;}
       <div class="nav-item" onclick="showPage('billing')"><span class="nav-icon">🧾</span>월별 청구 생성</div>
       <div class="nav-item" onclick="showPage('students')"><span class="nav-icon">👦</span>원생 관리</div>
       <div class="nav-item" onclick="showPage('spotcare')"><span class="nav-icon">🧸</span>일시돌봄 기록</div>
+      <div class="nav-item" onclick="showPage('refund')"><span class="nav-icon">💸</span>환불 관리</div>
       <div class="nav-item" onclick="showPage('special')"><span class="nav-icon">⚠️</span>특이사항 체크</div>
     </div>
     <div class="nav-section" onclick="toggleNavGroup('nav-report')">보고<span id="nav-report-arrow">▾</span></div>
@@ -321,6 +322,7 @@ tr.inactive td{opacity:.38;}
         var sp = '';
         try{ sp = sessionStorage.getItem('current_page')||''; }catch(e){}
         var T = {dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
+          spotcare:'일시돌봄 기록', refund:'환불 관리',
           special:'특이사항 체크', monthly:'신규·퇴원 관리', consult:'상담 일지',
           'ag-home':'행정 업무 가이드', master:'단가 설정', textbook:'외부교재비 설정',
           sms:'SMS 템플릿', classconfig:'반 목록 관리', yearend:'학년도 관리', calc:'계산기'};
@@ -504,6 +506,45 @@ tr.inactive td{opacity:.38;}
           </div>
           <div id="spotcare-list"></div>
         </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- REFUND -->
+    <div class="page" id="page-refund">
+      <div style="max-width:1000px;">
+      <div class="info-box">💸 환불 관리 — <b>청구 차감</b>(여행·병결 등 다음 청구에서 깎을 내역) / <b>퇴원 환불</b>(계좌로 송금할 내역). 송금은 매주 금요일 대표님이 처리합니다.</div>
+
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="btn btn-primary btn-sm" onclick="openRefundModal('deduct')">＋ 청구 차감</button>
+        <button class="btn btn-primary btn-sm" onclick="openRefundModal('withdraw')">＋ 퇴원 환불</button>
+        <div style="flex:1;"></div>
+        <button class="btn btn-secondary btn-sm" onclick="copyRefundRequest()">📋 이번 주 송금요청 복사</button>
+      </div>
+
+      <div class="card" style="padding:12px 14px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="position:relative;flex:1;min-width:200px;max-width:280px;">
+            <input type="text" id="refund-search" placeholder="🔍 학생 이름 검색..." oninput="renderRefundList()"
+              style="font-size:13px;padding:7px 12px;width:100%;box-sizing:border-box;border-radius:8px;">
+          </div>
+          <select id="refund-filter-type" onchange="renderRefundList()" style="font-size:13px;padding:7px 10px;border-radius:8px;width:auto;">
+            <option value="">전체 유형</option>
+            <option value="deduct">청구 차감</option>
+            <option value="withdraw">퇴원 환불</option>
+          </select>
+          <select id="refund-filter-staff" onchange="renderRefundList()" style="font-size:13px;padding:7px 10px;border-radius:8px;width:auto;">
+            <option value="">전체 담당자</option>
+          </select>
+          <select id="refund-filter-procYM" onchange="renderRefundList()" style="font-size:13px;padding:7px 10px;border-radius:8px;width:auto;">
+            <option value="">전체 처리월</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="clearRefundFilters()">필터 해제</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div id="refund-list"></div>
       </div>
       </div>
     </div>
@@ -852,6 +893,7 @@ tr.inactive td{opacity:.38;}
             <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
             <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
           </select>
+          <script>(function(){try{var m=new Date().getMonth()+1;var s=document.getElementById('monthly-month');if(s)s.value=m;}catch(e){}})();</script>
           <span id="monthly-summary-badge" style="font-size:13px;color:var(--text2);"></span>
         </div>
       </div>
@@ -1544,6 +1586,8 @@ async function loadYearDataFromFB(y){
         data.tbMaster = Object.values(data.tbMaster);
       if(data.spotCare && !Array.isArray(data.spotCare))
         data.spotCare = Object.values(data.spotCare);
+      if(data.refunds && !Array.isArray(data.refunds))
+        data.refunds = Object.values(data.refunds);
       // freq 마이그레이션: 'kelpie' → '3'
       (data.students||[]).forEach(st=>{ if(st.freq==='kelpie') st.freq='3'; });
       // care 마이그레이션: '1회' → '주1회' (1회성 옵션 제거로 인한 보정)
@@ -1832,7 +1876,7 @@ async function init(){
   // — 무거운 렌더 호출보다 먼저 화면을 전환해 대시보드가 잠깐 보이는 깜빡임 방지
   initNavGroups();
   const savedPage = sessionStorage.getItem('current_page');
-  const validPages = ['dashboard','billing','students','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
+  const validPages = Object.keys(PAGE_TITLES);
   showPage(validPages.includes(savedPage) ? savedPage : 'dashboard');
   // 첫 페인트용 임시 스타일 제거 (이후 화면 전환이 정상 동작하도록)
   document.getElementById('_early-page-style')?.remove();
@@ -1853,7 +1897,7 @@ function loadSampleTB(){
 }
 const PAGE_TITLES={
   dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
-  spotcare:'일시돌봄 기록',
+  spotcare:'일시돌봄 기록', refund:'환불 관리',
   special:'특이사항 체크', master:'단가 설정', textbook:'외부교재비 설정',
   yearend:'학년도 관리',
   calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'신규·퇴원 관리', consult:'상담 일지',
@@ -1871,6 +1915,7 @@ function showPage(p){
   if(p==='dashboard')renderDashboard();
   if(p==='students')renderStudentTable();
   if(p==='spotcare')initSpotCarePage();
+  if(p==='refund')initRefundPage();
   if(p==='special')renderSpecialList('all');
   if(p==='textbook')renderTextbookTable();
   if(p==='yearend')renderArchiveList();
@@ -2218,9 +2263,14 @@ function addSpotCare(){
 }
 function removeSpotCare(id){
   if(!CY.spotCare) return;
+  const rec = CY.spotCare.find(r=>r.id===id);
+  const s = rec ? S().find(x=>x.id===rec.sid) : null;
+  const label = rec ? `${rec.date} ${s?s.name:''} 일시돌봄` : '이 기록';
+  if(!confirm(`${label}을(를) 삭제할까요?`)) return;
   CY.spotCare = CY.spotCare.filter(r=>r.id!==id);
   saveYearData();
   renderSpotCare();
+  toast('일시돌봄 기록 삭제됨','success',1500);
 }
 function renderSpotCare(){
   const monthEl = document.getElementById('spotcare-month');
@@ -2281,6 +2331,496 @@ function spotCareCountForMonth(ym6){
   });
   return map;
 }
+
+// ══════════════ 환불 관리 ══════════════
+// 퇴원 환불 기본 항목
+const WITHDRAW_ITEMS = ['도서보증금','교재비','셔틀비','재료비','교습비','초도물품비','외부교재비'];
+
+function initRefundPage(){
+  if(!window._refundOutsideBound){
+    window._refundOutsideBound = true;
+    document.addEventListener('click', function(e){
+      const box=document.getElementById('rf-student-suggest');
+      const sc=document.getElementById('rf-student-search');
+      if(box && box.style.display!=='none' && !box.contains(e.target) && e.target!==sc) box.style.display='none';
+    });
+  }
+  // 처리월 필터 옵션 채우기 (기록에 있는 처리월들)
+  const pf = document.getElementById('refund-filter-procYM');
+  if(pf){
+    const cur = pf.value;
+    const set = new Set((CY.refunds||[]).map(r=>r.procYM).filter(Boolean));
+    const sorted = [...set].sort().reverse();
+    pf.innerHTML = '<option value="">전체 처리월</option>' +
+      sorted.map(ym=>`<option value="${ym}" ${ym===cur?'selected':''}>${ym.replace('-','년 ')}월</option>`).join('');
+  }
+  // 담당자 필터 옵션 채우기 (기록에 입력된 담당자들)
+  const sf = document.getElementById('refund-filter-staff');
+  if(sf){
+    const cur = sf.value;
+    const set = new Set((CY.refunds||[]).map(r=>r.staff).filter(Boolean));
+    const sorted = [...set].sort((a,b)=>a.localeCompare(b,'ko'));
+    sf.innerHTML = '<option value="">전체 담당자</option>' +
+      sorted.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+  }
+  renderRefundList();
+}
+
+function clearRefundFilters(){
+  ['refund-search','refund-filter-type','refund-filter-staff','refund-filter-procYM'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  renderRefundList();
+}
+
+function thisMonthYM(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+
+// 처리월 드롭다운 옵션 (이번달 기준 ±6개월)
+function refundMonthOptions(selected){
+  const opts=[]; const base=new Date();
+  for(let i=-2;i<=6;i++){
+    const d=new Date(base.getFullYear(), base.getMonth()+i, 1);
+    const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    opts.push(`<option value="${ym}" ${ym===selected?'selected':''}>${d.getFullYear()}년 ${d.getMonth()+1}월</option>`);
+  }
+  return opts.join('');
+}
+
+// 환불 입력 모달
+function openRefundModal(type, editId){
+  const editing = editId ? (CY.refunds||[]).find(r=>r.id===editId) : null;
+  const t = editing ? editing.type : type;
+  const old = document.getElementById('refund-modal');
+  if(old) old.remove();
+
+  const procYM = editing ? editing.procYM : thisMonthYM();
+  const editingStudent = editing ? S().find(s=>s.id===editing.sid) : null;
+  const studentLabel = editingStudent ? `${editingStudent.name}${editingStudent.ename?' ('+editingStudent.ename+')':''} · ${editingStudent.cls}` : '';
+
+  let bodyHTML;
+  if(t==='deduct'){
+    bodyHTML = `
+      <div class="form-row"><label>차감 기간</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="position:relative;display:inline-flex;align-items:center;">
+            <input type="text" id="rf-start" value="${editing?.start||''}" placeholder="YYYYMMDD" maxlength="10"
+              oninput="autoFormatDate(this);calcRefundDeduct()" onblur="validateDateField(this)"
+              style="font-size:13px;padding:7px 30px 7px 7px;border-radius:8px;width:120px;">
+            <button type="button" onclick="openRefundDatePicker('rf-start')" title="달력 선택"
+              style="position:absolute;right:6px;background:none;border:none;cursor:pointer;font-size:14px;color:#888;padding:0;">📅</button>
+            <input type="date" id="rf-start-cal" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;"
+              onchange="document.getElementById('rf-start').value=this.value;calcRefundDeduct()">
+          </span>
+          <span style="color:var(--text3);">~</span>
+          <span style="position:relative;display:inline-flex;align-items:center;">
+            <input type="text" id="rf-end" value="${editing?.end||''}" placeholder="YYYYMMDD" maxlength="10"
+              oninput="autoFormatDate(this);calcRefundDeduct()" onblur="validateDateField(this)"
+              style="font-size:13px;padding:7px 30px 7px 7px;border-radius:8px;width:120px;">
+            <button type="button" onclick="openRefundDatePicker('rf-end')" title="달력 선택"
+              style="position:absolute;right:6px;background:none;border:none;cursor:pointer;font-size:14px;color:#888;padding:0;">📅</button>
+            <input type="date" id="rf-end-cal" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;"
+              onchange="document.getElementById('rf-end').value=this.value;calcRefundDeduct()">
+          </span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;">숫자 8자리 입력(20260801) 또는 📅 달력 선택 · 주말·공휴일 제외 영업일 계산 (금액 수정 가능)</div>
+      </div>
+      <div class="form-row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div><label>차감 일수</label><br>
+          <input type="number" id="rf-days" value="${editing?.days||''}" min="0" oninput="calcRefundDeduct()" style="font-size:13px;padding:7px;border-radius:8px;width:80px;"></div>
+        <div><label>하루 단가</label><br>
+          <input type="number" id="rf-rate" value="${editing?.rate||''}" step="1000" oninput="calcRefundDeduct()" style="font-size:13px;padding:7px;border-radius:8px;width:110px;"></div>
+        <div style="flex:1;min-width:160px;"><label>차감 금액 <span style="font-size:10px;color:var(--text3);font-weight:400;">(직접 수정 가능)</span></label><br>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="rf-amount" value="${editing?.amount||''}" step="1000" placeholder="자동 계산"
+              oninput="markRefundAmountManual()" style="font-size:13px;padding:7px;border-radius:8px;flex:1;min-width:0;font-weight:700;color:var(--accent2);">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="recalcRefundAmount()" title="일수×단가로 다시 계산" style="white-space:nowrap;">↻ 자동</button>
+          </div></div>
+      </div>
+    `;
+  } else {
+    const items = editing?.items || WITHDRAW_ITEMS.map(label=>({label, amount:0, memo:''}));
+    bodyHTML = `
+      <div class="form-row"><label>환불 계좌</label>
+        <input type="text" id="rf-account" value="${(editing?.account||'').replace(/"/g,'&quot;')}" placeholder="은행 계좌번호 예금주" style="font-size:13px;padding:7px;width:100%;box-sizing:border-box;border-radius:8px;"></div>
+      <div class="form-row"><label>환불 항목</label>
+        <div id="rf-items">
+          ${items.map((it,i)=>refundItemRow(it,i)).join('')}
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="addRefundItemRow()">＋ 항목 추가</button>
+        <div style="text-align:right;margin-top:8px;font-weight:700;">합계: <span id="rf-items-total" style="color:var(--accent2);">0원</span></div>
+      </div>
+    `;
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'refund-modal';
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:560px;">
+      <div class="modal-header">
+        <span>${editing?'환불 수정':(t==='deduct'?'청구 차감 추가':'퇴원 환불 추가')}</span>
+        <button class="modal-close" onclick="document.getElementById('refund-modal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row"><label>학생</label>
+          <div style="position:relative;">
+            <input type="text" id="rf-student-search" autocomplete="off" placeholder="이름 검색..." value="${studentLabel.replace(/"/g,'&quot;')}"
+              oninput="filterRefundStudents()" onfocus="filterRefundStudents()"
+              style="font-size:13px;padding:7px 10px;width:100%;box-sizing:border-box;border-radius:8px;">
+            <input type="hidden" id="rf-student" value="${editing?.sid||''}">
+            <div id="rf-student-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:60;
+              background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;margin-top:2px;
+              max-height:220px;overflow-y:auto;box-shadow:0 4px 14px rgba(0,0,0,.12);"></div>
+          </div></div>
+        ${bodyHTML}
+        <div class="form-row"><label>사유</label>
+          <input type="text" id="rf-reason" value="${(editing?.reason||'').replace(/"/g,'&quot;')}" placeholder="예: 일본 학교로 전학 / 여행(제주) / 병결" style="font-size:13px;padding:7px;width:100%;box-sizing:border-box;border-radius:8px;"></div>
+        <div class="form-row" style="display:flex;gap:14px;flex-wrap:wrap;">
+          <div><label>처리 월</label><br><select id="rf-procYM" style="font-size:13px;padding:7px;border-radius:8px;">${refundMonthOptions(procYM)}</select></div>
+          <div style="flex:1;min-width:120px;"><label>담당자</label><br><input type="text" id="rf-staff" value="${(editing?.staff||'').replace(/"/g,'&quot;')}" placeholder="담당자 이름" style="font-size:13px;padding:7px;width:100%;box-sizing:border-box;border-radius:8px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('refund-modal').remove()">취소</button>
+        <button class="btn btn-primary" onclick="saveRefund('${t}','${editId||''}')">저장</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _refundAmountManual = !!(editing && editing.amount); // 수정 모드면 기존 금액 보존
+  if(t==='withdraw') setTimeout(updateRefundItemsTotal, 0);
+}
+
+// 모달 내 학생 자동완성
+function filterRefundStudents(){
+  const sch = document.getElementById('rf-student-search');
+  const box = document.getElementById('rf-student-suggest');
+  if(!sch||!box) return;
+  const q = (sch.value||'').trim().toLowerCase();
+  document.getElementById('rf-student').value = ''; // 입력 바뀌면 선택 해제
+  const list = sortByClassOrder(S()).filter(s=>{
+    if(!q) return true;
+    return (s.name||'').toLowerCase().includes(q) || (s.ename||'').toLowerCase().includes(q) || (s.cls||'').toLowerCase().includes(q);
+  }).slice(0,30);
+  if(!list.length){ box.innerHTML='<div style="padding:8px 12px;color:var(--text3);font-size:13px;">검색 결과 없음</div>'; box.style.display='block'; return; }
+  box.innerHTML = list.map(s=>`
+    <div onclick="selectRefundStudent('${s.id}')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <strong>${s.name}</strong>${s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''} <span style="color:var(--text3);font-size:11px;">· ${s.cls}</span>
+    </div>`).join('');
+  box.style.display='block';
+}
+// 날짜 입력 마스킹: 숫자만 받아 YYYY-MM-DD 자동 포맷
+function maskDateInput(el){
+  let v = el.value.replace(/[^0-9]/g,'').slice(0,8); // 최대 8자리(YYYYMMDD)
+  let out = v;
+  if(v.length>4 && v.length<=6) out = v.slice(0,4)+'-'+v.slice(4);
+  else if(v.length>6) out = v.slice(0,4)+'-'+v.slice(4,6)+'-'+v.slice(6);
+  el.value = out;
+}
+
+function selectRefundStudent(sid){
+  const s = S().find(x=>x.id===sid);
+  if(!s) return;
+  document.getElementById('rf-student').value = sid;
+  document.getElementById('rf-student-search').value = `${s.name}${s.ename?' ('+s.ename+')':''} · ${s.cls}`;
+  const box=document.getElementById('rf-student-suggest');
+  if(box) box.style.display='none';
+  // 청구 차감이면 그 학생의 하루 차감 단가 자동 입력
+  const rateEl = document.getElementById('rf-rate');
+  if(rateEl && !rateEl.value){
+    const rate = getDefaultDeductRate(s);
+    if(rate){ rateEl.value = rate; calcRefundDeduct(); }
+  }
+}
+
+// 달력 버튼 → 숨겨진 date input 열기 (텍스트칸 현재값을 달력에 반영)
+function openRefundDatePicker(textId){
+  const cal = document.getElementById(textId+'-cal');
+  const txt = document.getElementById(textId);
+  if(!cal) return;
+  if(txt && /^\d{4}-\d{2}-\d{2}$/.test(txt.value)) cal.value = txt.value;
+  if(cal.showPicker){ try{ cal.showPicker(); return; }catch(e){} }
+  cal.style.pointerEvents='auto'; cal.style.width='auto'; cal.style.opacity='1';
+  cal.focus(); cal.click();
+}
+
+// 차감 금액이 사용자에 의해 수동 수정되었는지
+let _refundAmountManual = false;
+function markRefundAmountManual(){ _refundAmountManual = true; }
+function recalcRefundAmount(){
+  _refundAmountManual = false;
+  const daysEl=document.getElementById('rf-days');
+  const rateEl=document.getElementById('rf-rate');
+  const amtEl=document.getElementById('rf-amount');
+  if(daysEl&&rateEl&&amtEl){
+    amtEl.value = (parseInt(daysEl.value)||0)*(parseInt(rateEl.value)||0);
+  }
+}
+
+// 차감 기간/일수/단가 → 차감 금액 자동 계산 (수동 수정 시 금액은 건드리지 않음)
+function calcRefundDeduct(){
+  const startEl=document.getElementById('rf-start');
+  const endEl=document.getElementById('rf-end');
+  const daysEl=document.getElementById('rf-days');
+  const rateEl=document.getElementById('rf-rate');
+  const amtEl=document.getElementById('rf-amount');
+  if(!daysEl||!rateEl||!amtEl) return;
+  // 기간이 둘 다 있으면 영업일 수 자동 계산 (사용자가 일수칸 직접 편집 중이 아니면)
+  if(startEl && endEl && startEl.value && endEl.value && document.activeElement!==daysEl){
+    const wd = weekdayCount(startEl.value, endEl.value);
+    if(wd>=0) daysEl.value = wd;
+  }
+  const days = parseInt(daysEl.value)||0;
+  const rate = parseInt(rateEl.value)||0;
+  // 금액을 수동 수정하지 않았고, 금액칸 직접 편집 중이 아니면 자동 계산
+  if(!_refundAmountManual && document.activeElement!==amtEl){
+    amtEl.value = days*rate;
+  }
+}
+
+// 2026년 대한민국 공휴일 (학원 휴원 기준, 관공서 공휴일)
+const HOLIDAYS_2026 = new Set([
+  '2026-01-01', // 신정
+  '2026-02-16','2026-02-17','2026-02-18', // 설날
+  '2026-03-01','2026-03-02', // 삼일절+대체
+  '2026-05-05', // 어린이날
+  '2026-05-24','2026-05-25', // 부처님오신날+대체
+  '2026-06-06', // 현충일
+  '2026-08-15','2026-08-17', // 광복절+대체
+  '2026-09-24','2026-09-25','2026-09-26','2026-09-28', // 추석+대체
+  '2026-10-03','2026-10-05', // 개천절+대체
+  '2026-10-09', // 한글날
+  '2026-12-25'  // 크리스마스
+]);
+function isHoliday(dateStr){ return HOLIDAYS_2026.has(dateStr); }
+
+// 두 날짜 사이 영업일(월~금, 공휴일 제외) 수 (양 끝 포함)
+function weekdayCount(start, end){
+  const s=new Date(start), e=new Date(end);
+  if(isNaN(s)||isNaN(e)||e<s) return -1;
+  let cnt=0; const d=new Date(s);
+  while(d<=e){
+    const w=d.getDay();
+    const ds = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if(w!==0 && w!==6 && !isHoliday(ds)) cnt++;
+    d.setDate(d.getDate()+1);
+  }
+  return cnt;
+}
+
+function refundItemRow(it, i){
+  return `<div class="rf-item-row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px;">
+    <input type="text" class="rf-item-label" value="${(it.label||'').replace(/"/g,'&quot;')}" placeholder="항목" style="font-size:12px;padding:5px;width:110px;">
+    <input type="number" class="rf-item-amount" value="${it.amount||0}" step="1000" oninput="updateRefundItemsTotal()" style="font-size:12px;padding:5px;width:100px;">
+    <input type="text" class="rf-item-memo" value="${(it.memo||'').replace(/"/g,'&quot;')}" placeholder="차감 메모(선택)" style="font-size:12px;padding:5px;flex:1;">
+    <span onclick="this.closest('.rf-item-row').remove();updateRefundItemsTotal()" style="cursor:pointer;color:var(--red);font-size:13px;" title="삭제">✕</span>
+  </div>`;
+}
+function addRefundItemRow(){
+  const box=document.getElementById('rf-items');
+  if(!box) return;
+  const div=document.createElement('div');
+  div.innerHTML=refundItemRow({label:'',amount:0,memo:''},0);
+  box.appendChild(div.firstElementChild);
+}
+function updateRefundItemsTotal(){
+  let t=0;
+  document.querySelectorAll('#rf-items .rf-item-amount').forEach(el=>{ t+=parseInt(el.value)||0; });
+  const el=document.getElementById('rf-items-total');
+  if(el) el.textContent=won(t);
+}
+
+function saveRefund(type, editId){
+  const sid = document.getElementById('rf-student').value;
+  if(!sid){ toast('학생을 선택하세요','warn'); return; }
+  const reason = document.getElementById('rf-reason').value.trim();
+  const procYM = document.getElementById('rf-procYM').value;
+  const staff = document.getElementById('rf-staff').value;
+  if(!staff){ toast('담당자를 선택하세요','warn'); return; }
+
+  let rec = { id: editId || ('rf'+Date.now()), type, sid, reason, procYM, staff,
+              createdAt: editId ? undefined : new Date().toISOString() };
+
+  if(type==='deduct'){
+    rec.start = document.getElementById('rf-start').value;
+    rec.end = document.getElementById('rf-end').value;
+    rec.days = parseInt(document.getElementById('rf-days')?.value)||0;
+    rec.rate = parseInt(document.getElementById('rf-rate')?.value)||0;
+    rec.amount = parseInt(document.getElementById('rf-amount').value)||0;
+  } else {
+    rec.account = document.getElementById('rf-account').value.trim();
+    const items=[];
+    document.querySelectorAll('#rf-items .rf-item-row').forEach(row=>{
+      const label=row.querySelector('.rf-item-label').value.trim();
+      const amount=parseInt(row.querySelector('.rf-item-amount').value)||0;
+      const memo=row.querySelector('.rf-item-memo').value.trim();
+      if(label && amount) items.push({label,amount,memo});
+    });
+    rec.items = items;
+    rec.amount = items.reduce((a,it)=>a+it.amount,0);
+    if(!editId) rec.status = 'pending'; // 송금 대기
+  }
+
+  if(!CY.refunds) CY.refunds=[];
+  if(editId){
+    const idx=CY.refunds.findIndex(r=>r.id===editId);
+    if(idx>=0){
+      // 기존 createdAt/status 보존
+      rec.createdAt = CY.refunds[idx].createdAt;
+      if(type==='withdraw') rec.status = CY.refunds[idx].status||'pending';
+      CY.refunds[idx]=rec;
+    }
+  } else {
+    CY.refunds.push(rec);
+  }
+  saveYearData();
+  document.getElementById('refund-modal').remove();
+  initRefundPage();
+  toast('환불 내역 저장됨','success');
+}
+
+function deleteRefund(id){
+  if(!confirm('이 환불 내역을 삭제할까요?')) return;
+  CY.refunds = (CY.refunds||[]).filter(r=>r.id!==id);
+  saveYearData();
+  renderRefundList();
+  toast('삭제됨','success',1500);
+}
+
+function toggleRefundStatus(id){
+  const r=(CY.refunds||[]).find(x=>x.id===id);
+  if(!r) return;
+  r.status = r.status==='done' ? 'pending' : 'done';
+  if(r.status==='done') r.sentAt = new Date().toISOString();
+  saveYearData();
+  renderRefundList();
+}
+
+function renderRefundList(){
+  const el = document.getElementById('refund-list');
+  if(!el) return;
+  const q = (document.getElementById('refund-search')?.value||'').trim().toLowerCase();
+  const fType = document.getElementById('refund-filter-type')?.value||'';
+  const fStaff = document.getElementById('refund-filter-staff')?.value||'';
+  const fProcYM = document.getElementById('refund-filter-procYM')?.value||'';
+
+  let list = (CY.refunds||[]).slice().sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+  list = list.filter(r=>{
+    const s = S().find(x=>x.id===r.sid);
+    const nm = (s?.name||'')+(s?.ename||'');
+    if(q && !nm.toLowerCase().includes(q)) return false;
+    if(fType && r.type!==fType) return false;
+    if(fStaff && r.staff!==fStaff) return false;
+    if(fProcYM && r.procYM!==fProcYM) return false;
+    return true;
+  });
+
+  if(!list.length){ el.innerHTML='<div class="text-sm text-muted" style="padding:8px 0;">환불 내역이 없습니다.</div>'; return; }
+
+  el.innerHTML = `<table style="width:100%;font-size:13px;"><thead><tr style="background:var(--surface2);">
+    <th style="text-align:left;padding:8px;">유형</th>
+    <th style="text-align:left;padding:8px;">학생</th>
+    <th style="text-align:left;padding:8px;">내용</th>
+    <th style="text-align:right;padding:8px;">금액</th>
+    <th style="text-align:center;padding:8px;">처리월</th>
+    <th style="text-align:center;padding:8px;">담당</th>
+    <th style="text-align:center;padding:8px;">상태</th>
+    <th style="padding:8px;"></th></tr></thead><tbody>` +
+    list.map(r=>{
+      const s = S().find(x=>x.id===r.sid);
+      const nm = s ? `${s.name} <span style="color:var(--text3);font-size:11px;">${s.cls}</span>` : '(삭제된 학생)';
+      const typeBadge = r.type==='deduct'
+        ? '<span style="background:#FEF3C7;color:#92400E;padding:2px 7px;border-radius:10px;font-size:11px;">청구차감</span>'
+        : '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 7px;border-radius:10px;font-size:11px;">퇴원환불</span>';
+      let detail='';
+      if(r.type==='deduct'){
+        detail = `${r.start||''}~${r.end||''}${r.reason?' · '+escapeHtml(r.reason):''}`;
+      } else {
+        const itemStr = (r.items||[]).map(it=>it.label).join(', ');
+        detail = `${itemStr}${r.reason?' · '+escapeHtml(r.reason):''}<br><span style="color:var(--text3);font-size:11px;">${escapeHtml(r.account||'')}</span>`;
+      }
+      const procLabel = r.procYM ? r.procYM.replace('-','년 ')+'월' : '-';
+      let statusCell='-';
+      if(r.type==='withdraw'){
+        statusCell = r.status==='done'
+          ? `<span onclick="toggleRefundStatus('${r.id}')" style="cursor:pointer;color:#16A34A;font-weight:600;" title="클릭하여 대기로">✔ 완료</span>`
+          : `<span onclick="toggleRefundStatus('${r.id}')" style="cursor:pointer;color:#D97706;font-weight:600;" title="클릭하여 완료로">⏳ 대기</span>`;
+      } else if(r.type==='deduct'){
+        const reflected = isDeductReflected(r);
+        statusCell = reflected
+          ? `<span style="color:#16A34A;font-weight:600;" title="${r.procYM} 청구에 차감 반영됨">✅ 반영됨</span>`
+          : `<span style="color:#DC2626;font-weight:600;" title="${r.procYM} 청구에 아직 차감 안 됨 — 청구 화면에서 차감 입력 필요">⚠️ 미반영</span>`;
+      }
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;">${typeBadge}</td>
+        <td style="padding:8px;">${nm}</td>
+        <td style="padding:8px;">${detail}</td>
+        <td style="padding:8px;text-align:right;font-weight:700;" class="mono">${won(r.amount||0)}</td>
+        <td style="padding:8px;text-align:center;font-size:12px;">${procLabel}</td>
+        <td style="padding:8px;text-align:center;font-size:12px;">${r.staff||'-'}</td>
+        <td style="padding:8px;text-align:center;">${statusCell}</td>
+        <td style="padding:8px;white-space:nowrap;">
+          <span onclick="openRefundModal('${r.type}','${r.id}')" style="cursor:pointer;color:var(--accent2);font-size:12px;margin-right:8px;">수정</span>
+          <span onclick="deleteRefund('${r.id}')" style="cursor:pointer;color:var(--red);font-size:12px;">삭제</span>
+        </td></tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+// 이번 주 송금요청 텍스트 복사 (퇴원환불 중 대기 건)
+function copyRefundRequest(){
+  const pending = (CY.refunds||[]).filter(r=>r.type==='withdraw' && r.status!=='done');
+  if(!pending.length){ toast('송금 대기 중인 퇴원 환불이 없습니다','info'); return; }
+  let txt = `이사장님, 안녕하세요.\n퇴원 환불 ${pending.length}명 송금 요청드립니다.\n\n`;
+  pending.forEach((r,i)=>{
+    const s=S().find(x=>x.id===r.sid);
+    txt += `${i+1}. ${s?(s.cls+' '+s.name):'(학생)'}\n`;
+    txt += `계좌번호 : ${r.account||''}\n`;
+    (r.items||[]).forEach((it,j)=>{
+      txt += `${j+1}) ${it.label} : ${ (it.amount||0).toLocaleString() }원${it.memo?' ('+it.memo+')':''}\n`;
+    });
+    txt += `총 : ${(r.amount||0).toLocaleString()}원\n`;
+    if(r.reason) txt += `** 퇴원사유 : ${r.reason}\n`;
+    txt += `\n`;
+  });
+  navigator.clipboard.writeText(txt.trim()).then(()=>{
+    toast(`송금요청 ${pending.length}건 복사됨 — 카톡에 붙여넣기`,'success',3000);
+  }).catch(()=>{
+    // 클립보드 실패 시 프롬프트로 표시
+    prompt('아래 내용을 복사하세요:', txt.trim());
+  });
+}
+
+// 청구차감 환불이 해당 처리월 청구에 반영됐는지 (느슨한 판단: 그 달 그 학생 차감 존재 여부)
+// procYM은 'YYYY-MM' 형식 → billings 키는 'YYYYMM'
+function isDeductReflected(r){
+  if(r.type!=='deduct' || !r.procYM) return null; // 판단 대상 아님
+  const ymKey = r.procYM.replace('-','');
+  const ded = CY.billings?.[ymKey]?.deductions;
+  return !!(ded && ded[r.sid]);
+}
+
+// 청구 생성 시: 이 달이 처리월인 청구차감 중 미반영 건 경고
+function checkRefundDeductReflection(ymKey){
+  // ymKey: 'YYYYMM' → 'YYYY-MM'
+  const procYM = ymKey.slice(0,4)+'-'+ymKey.slice(4,6);
+  const targets = (CY.refunds||[]).filter(r=> r.type==='deduct' && r.procYM===procYM);
+  if(!targets.length) return;
+  const missing = targets.filter(r=> !isDeductReflected(r));
+  if(!missing.length) return;
+  // 미반영 건 목록으로 경고
+  const lines = missing.map(r=>{
+    const s = S().find(x=>x.id===r.sid);
+    return `· ${s?s.name:'(학생)'} ${won(r.amount||0)}${r.reason?' ('+r.reason+')':''}`;
+  }).join('\n');
+  const msg = `⚠️ 이 달(${procYM}) 처리 예정인 청구 차감 ${missing.length}건이 아직 청구에 반영되지 않았습니다.\n\n${lines}\n\n각 학생 행에서 차감을 입력해주세요. (환불 관리 메뉴에서도 ⚠️ 미반영으로 표시됩니다)`;
+  setTimeout(()=>alert(msg), 300);
+}
+
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 // 교습비 실제 청구액 — 셀 표시와 합계가 똑같이 쓰는 단일 기준
 // override > (차감/형제할인 반영) 순. 셀 표시 로직(2490대)과 반드시 동일하게 유지.
 function effTuition(s, a){
@@ -2418,6 +2958,7 @@ function generateBilling(silent=false){
   document.getElementById('btn-unclose-billing').style.display = isClosed ? 'inline-flex' : 'none';
   updateBillingClassFilter();renderBillingTable();
   checkBillingAlerts(month);
+  if(!silent) checkRefundDeductReflection(ym);
   if(!silent && btn){ btn.textContent='⚡ 청구서 생성'; btn.disabled=false; }
   if(!silent) toast(`${year}년 ${month}월 청구서가 생성되었습니다. 총 ${currentBilling.length}명`, 'success', 2500);
 }
@@ -4909,6 +5450,11 @@ function addFeeItem(brand, type){
 // MONTHLY REPORT — 신규·퇴원 관리
 // ══════════════════════════════════════════════
 function initMonthlySelectors(){
+  // 월은 항상 현재월로 먼저 세팅 (새로고침 시 1월 깜빡임 방지)
+  const mSel = document.getElementById('monthly-month');
+  if(mSel && !mSel.dataset.userset){
+    mSel.value = new Date().getMonth()+1;
+  }
   const ySel = document.getElementById('monthly-year');
   if(!ySel || ySel.options.length > 0) return;
   for(let y=2024;y<=2028;y++){
@@ -4917,11 +5463,11 @@ function initMonthlySelectors(){
     if(y===CY.year) o.selected=true;
     ySel.appendChild(o);
   }
-  const now = new Date();
-  document.getElementById('monthly-month').value = now.getMonth()+1;
 }
 
 function onMonthlyChange(){
+  const mSel=document.getElementById('monthly-month');
+  if(mSel) mSel.dataset.userset='1'; // 사용자가 직접 바꾼 월은 유지
   renderMonthlyReport();
   const y=document.getElementById('monthly-year')?.value;
   const mo=document.getElementById('monthly-month')?.value;
@@ -5623,7 +6169,7 @@ function toggleNavGroup(id){
 function expandNavGroupForPage(p){
   const map = {
     dashboard:'nav-main',
-    billing:'nav-billing', students:'nav-billing', special:'nav-billing',
+    billing:'nav-billing', students:'nav-billing', spotcare:'nav-billing', refund:'nav-billing', special:'nav-billing',
     monthly:'nav-report', consult:'nav-report',
     master:'nav-settings', textbook:'nav-settings', sms:'nav-settings',
     'ag-home':'nav-guide',
@@ -5767,10 +6313,19 @@ function showExtraItemsPopup(sid, el) {
   }, 0);
 }
 
+function closeRowAddPopup(){
+  const pop = document.getElementById('row-add-popup');
+  if(pop) pop.remove();
+  _rowMenuSid = null;
+  _rowMenuBtn = null;
+  if(_rowMenuCloseFn){ document.removeEventListener('click', _rowMenuCloseFn); _rowMenuCloseFn = null; }
+}
+
 function toggleRowAddMenu(sid, btn) {
-  const existing = document.getElementById('row-add-popup');
-  if(existing) existing.remove();
-  if(_rowMenuSid === sid) { _rowMenuSid = null; _rowMenuBtn = null; return; }
+  const wasOpen = !!document.getElementById('row-add-popup');
+  const sameSid = _rowMenuSid === sid;
+  closeRowAddPopup();           // 항상 기존 팝업·리스너 정리
+  if(wasOpen && sameSid) return; // 같은 +를 다시 누르면 토글로 닫기만
 
   _rowMenuSid = sid;
   _rowMenuBtn = btn;
@@ -5859,9 +6414,7 @@ function toggleRowAddMenu(sid, btn) {
 
 function rowAddItem(sid, item, amount) {
   addOnetimeRow(sid, item, amount);
-  const popup = document.getElementById('row-add-popup');
-  if(popup) popup.remove();
-  _rowMenuSid = null;
+  closeRowAddPopup();
   toast(`${S().find(x=>x.id===sid)?.name} — ${item} 추가됨`);
 }
 
@@ -5883,7 +6436,7 @@ function rowAddCustom(sid) {
       <input id="custom-ot-amount" type="number" min="0" step="10000" placeholder="금액"
         style="width:100%;font-size:12px;padding:6px 8px;margin-bottom:8px;box-sizing:border-box;">
       <div style="display:flex;gap:6px;">
-        <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="document.getElementById('row-add-popup')?.remove();_rowMenuSid=null;">취소</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="closeRowAddPopup()">취소</button>
         <button class="btn btn-primary btn-sm" style="flex:1;" onclick="rowAddCustomConfirm('${sid}')">추가</button>
       </div>
     </div>
@@ -5900,9 +6453,7 @@ function rowAddCustomConfirm(sid) {
   const item = (itemEl?.value||'').trim() || '기타';
   const amount = parseInt(amtEl?.value) || 0;
   addOnetimeRow(sid, item, amount);
-  const popup = document.getElementById('row-add-popup');
-  if(popup) popup.remove();
-  _rowMenuSid = null;
+  closeRowAddPopup();
   renderBillingTable();
   toast(`${S().find(x=>x.id===sid)?.name} — ${item} ${won(amount)} 추가됨`);
 }
