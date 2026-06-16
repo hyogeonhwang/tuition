@@ -381,8 +381,8 @@ tr.inactive td{opacity:.38;}
       <div class="billing-bar">
         <label style="font-size:13px;color:var(--text2);white-space:nowrap;font-weight:600;">청구 생성 월</label>
         <div style="display:flex;gap:4px;align-items:center;">
-          <select id="billing-year" style="max-width:95px;"></select>
-          <select id="billing-month">
+          <select id="billing-year" style="max-width:95px;" onchange="onBillingMonthChange()"></select>
+          <select id="billing-month" onchange="onBillingMonthChange()">
           <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
           <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
           <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
@@ -411,13 +411,25 @@ tr.inactive td{opacity:.38;}
           <select id="bf-class" onchange="renderBillingTable()" style="font-size:12px;padding:5px 8px;max-width:150px;">
             <option value="">전체 반</option>
           </select>
+          <input type="hidden" id="bf-item" value="">
+          <select id="bf-flag" onchange="renderBillingTable()" style="font-size:12px;padding:5px 8px;max-width:140px;">
+            <option value="">전체 보기</option>
+            <option value="ot">추가비용 있음</option>
+            <option value="spot">돌봄 있음</option>
+            <option value="shuttle">셔틀비 있음</option>
+            <option value="ext_textbook">외부교재비 있음</option>
+            <option value="deduct">차감 있음</option>
+            <option value="override">수기수정 있음</option>
+            <option value="sibling">형제할인 있음</option>
+            <option value="split">분할결제</option>
+          </select>
+          <div style="width:1px;height:22px;background:var(--border);margin:0 2px;"></div>
           <div style="position:relative;">
             <input type="text" id="bf-search" placeholder="🔍 이름 검색..." oninput="renderBillingTable();document.getElementById('bf-search-clear').style.display=this.value?'flex':'none';"
-              style="font-size:12px;padding:5px 26px 5px 10px;border:1px solid var(--border);border-radius:6px;width:130px;background:var(--surface);">
+              style="font-size:12px;padding:5px 26px 5px 10px;border:1px solid var(--border);border-radius:6px;width:150px;background:var(--surface);">
             <span id="bf-search-clear" onclick="document.getElementById('bf-search').value='';renderBillingTable();this.style.display='none';"
               style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;align-items:center;">✕</span>
           </div>
-          <input type="hidden" id="bf-item" value="">
           <button id="bf-clear-all" onclick="clearAllBillingFilters()" style="display:none;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--warn-bg,#fef3dc);cursor:pointer;color:var(--text2);">✕ 필터 초기화</button>
         </div>
         <div class="table-wrap" style="max-height:60vh;overflow-y:auto;"><table><thead id="billing-thead" style="position:sticky;top:0;z-index:10;"></thead><tbody id="billing-tbody"></tbody></table></div>
@@ -2883,6 +2895,25 @@ function restoreLastBilling(){
   document.getElementById('billing-month').value = month;
   generateBilling(true);
 }
+// 월/년 변경 시 자동 조회 (저장본을 복원하므로 안전 — 마감 데이터 안 덮어씀)
+function onBillingMonthChange(){
+  const year=parseInt(document.getElementById('billing-year').value);
+  const month=parseInt(document.getElementById('billing-month').value);
+  if(!year||!month) return;
+  generateBilling(true);   // silent: 토스트/버튼애니메이션 없이 그 달 조회
+  updateGenerateBtnLabel();
+}
+// 버튼 라벨: 이미 만든/마감한 달이면 '다시 조회', 새 달이면 '생성'
+function updateGenerateBtnLabel(){
+  const year=parseInt(document.getElementById('billing-year')?.value);
+  const month=parseInt(document.getElementById('billing-month')?.value);
+  const btn=document.getElementById('btn-generate');
+  if(!btn||!year||!month) return;
+  const ym = String(year)+String(month).padStart(2,'0');
+  const b = CY.billings?.[ym];
+  const hasData = b && (b.closed || b.preview || b.overrides || b.onetimeRows || b.deductions);
+  btn.textContent = hasData ? '🔄 청구서 다시 조회' : '⚡ 청구서 생성';
+}
 function generateBilling(silent=false){
   const btn = document.getElementById('btn-generate');
   if(!silent && btn){ btn.textContent='⏳ 생성 중...'; btn.disabled=true; }
@@ -2959,8 +2990,9 @@ function generateBilling(silent=false){
   updateBillingClassFilter();renderBillingTable();
   checkBillingAlerts(month);
   if(!silent) checkRefundDeductReflection(ym);
-  if(!silent && btn){ btn.textContent='⚡ 청구서 생성'; btn.disabled=false; }
+  if(!silent && btn){ btn.disabled=false; }
   if(!silent) toast(`${year}년 ${month}월 청구서가 생성되었습니다. 총 ${currentBilling.length}명`, 'success', 2500);
+  updateGenerateBtnLabel();
 }
 
 function closeBilling(){
@@ -3175,11 +3207,37 @@ function clearAllBillingFilters(){
   document.getElementById('bf-brand').value='';
   document.getElementById('bf-class').value='';
   document.getElementById('bf-search').value='';
+  const flagEl=document.getElementById('bf-flag'); if(flagEl) flagEl.value='';
   document.getElementById('bf-search-clear').style.display='none';
   document.getElementById('bf-clear-all').style.display='none';
   renderBillingTable();
 }
 // ── /청구서 컬럼 필터 ──
+
+// 청구 필터 드롭다운을 그 달 헤더 컬럼에 맞춰 재구성
+function syncBillingFlagOptions(h){
+  const sel = document.getElementById('bf-flag');
+  if(!sel) return;
+  const cur = sel.value;
+  const money = [['tuition','교습비']];
+  if(h.hasPkg) money.push(['pkg','패키지교재비']);
+  if(h.hasShuttle) money.push(['shuttle','셔틀비']);
+  if(h.hasExtTB) money.push(['ext_textbook','외부교재비']);
+  if(h.hasMat) money.push(['material','재료비']);
+  if(h.hasSci) money.push(['science','과학재료비']);
+  if(h.hasSnack) money.push(['snack','간식비']);
+  if(h.hasCare) money.push(['care','돌봄']);
+  if(h.hasOT) money.push(['ot','추가비용']);
+  const status = [['deduct','차감 있음'],['override','수기수정 있음'],['sibling','형제할인 있음']];
+  let html = '<option value="">전체 보기</option>';
+  html += '<optgroup label="금액 항목 (있는 원생만)">';
+  money.forEach(([v,l])=>{ html += `<option value="${v}">${l} 있음</option>`; });
+  html += '</optgroup><optgroup label="상태">';
+  status.forEach(([v,l])=>{ html += `<option value="${v}">${l}</option>`; });
+  html += '</optgroup>';
+  sel.innerHTML = html;
+  if([...sel.options].some(o=>o.value===cur)) sel.value = cur; else sel.value = '';
+}
 
 function renderBillingTable(){
   // 청구 데이터 없으면 자동 생성 후 렌더
@@ -3189,10 +3247,26 @@ function renderBillingTable(){
   const bq=(document.getElementById('bf-search')?.value||'').toLowerCase();
   const bfBrand = document.getElementById('bf-brand')?.value||'';
   const bfClass = document.getElementById('bf-class')?.value||'';
+  const bfFlag = document.getElementById('bf-flag')?.value||'';
   const rows=currentBilling.filter(({s,a})=>{
     if(bfBrand && s.brand!==bfBrand) return false;
     if(bfClass && s.cls!==bfClass) return false;
     if(bq && !s.name.includes(bq) && !(s.ename||'').toLowerCase().includes(bq)) return false;
+    // 특이내역 필터 (전체 보기 드롭다운에 통합)
+    if(bfFlag==='tuition' && !a.tuition) return false;
+    if(bfFlag==='pkg' && !a.textbook_pkg) return false;
+    if(bfFlag==='ot' && otAmtOf(s.id)<=0) return false;
+    if(bfFlag==='spot' && !(onetimeRows||[]).some(r=>r.sid===s.id && r._spot)) return false;
+    if(bfFlag==='shuttle' && !a.shuttle) return false;
+    if(bfFlag==='ext_textbook' && !a.ext_textbook) return false;
+    if(bfFlag==='material' && !a.material_alt) return false;
+    if(bfFlag==='science' && !a.science) return false;
+    if(bfFlag==='snack' && !a.snack) return false;
+    if(bfFlag==='care' && !a.care) return false;
+    if(bfFlag==='deduct' && !(deductions[s.id]?.amount>0)) return false;
+    if(bfFlag==='override' && !(billingOverrides[s.id] && Object.keys(billingOverrides[s.id]).length)) return false;
+    if(bfFlag==='sibling' && !s.sibling) return false;
+    // 특이내역 필터 끝
     if(billingFilters.item==='tuition' && !a.tuition) return false;
     if(billingFilters.item==='pkg' && !a.textbook_pkg) return false;
     if(billingFilters.item==='shuttle' && !a.shuttle) return false;
@@ -3202,6 +3276,7 @@ function renderBillingTable(){
     if(billingFilters.item==='snack' && !a.snack) return false;
     if(billingFilters.item==='care' && !a.care) return false;
     if(billingFilters.item==='onetone' && !a.onetone) return false;
+    if(billingFilters.item==='ot' && otAmtOf(s.id)<=0) return false;
     if(billingFilters.item==='split' && !s.split) return false;
     return true;
   }).sort((x,y)=>cmpClassOrder(x.s, y.s));
@@ -3221,16 +3296,18 @@ function renderBillingTable(){
   document.getElementById('billing-thead').innerHTML=`<tr style="background:var(--surface2,#f0eff8);">
     <th>브랜드</th><th>반</th>
     <th>원생명</th>
-    <th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('tuition')" title="교습비 필터">교습비${billingFilters.item==='tuition'?' ✓':' ▾'}</th>
-    ${hasPkg?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('pkg')">패키지교재비${billingFilters.item==='pkg'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
-    ${hasShuttle?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('shuttle')" title="셔틀 있는 원생만 보기">셔틀비${billingFilters.item==='shuttle'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
-    ${hasExtTB?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('ext_textbook')" title="외부교재비 있는 원생만 보기">외부교재비${billingFilters.item==='ext_textbook'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
-    ${hasMat?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('material')">재료비${billingFilters.item==='material'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">반기</div></th>`:''}
-    ${hasSci?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('science')">과학재료비${billingFilters.item==='science'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
-    ${hasSnack?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('snack')">간식비${billingFilters.item==='snack'?' ✓':' ▾'}<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
-    ${hasCare?`<th class="text-right" style="cursor:pointer;user-select:none;" onclick="toggleBillingItemFilter('care')" title="돌봄 있는 원생만 보기">돌봄${billingFilters.item==='care'?' ✓':' ▾'}</th>`:''}
+    <th class="text-right">교습비</th>
+    ${hasPkg?`<th class="text-right">패키지교재비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasShuttle?`<th class="text-right">셔틀비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasExtTB?`<th class="text-right">외부교재비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasMat?`<th class="text-right">재료비<div style="font-weight:400;font-size:10px;color:var(--text3)">반기</div></th>`:''}
+    ${hasSci?`<th class="text-right">과학재료비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasSnack?`<th class="text-right">간식비<div style="font-weight:400;font-size:10px;color:var(--text3)">분기</div></th>`:''}
+    ${hasCare?`<th class="text-right">돌봄</th>`:''}
     ${hasOT?`<th class="text-right">추가비용</th>`:''}
     <th class="text-right">최종 합계</th><th>비고</th><th style="width:32px;"></th></tr>`;
+  // 드롭다운 필터를 그 달 헤더 컬럼에 맞춰 동적 갱신 (금액 항목 그룹 + 상태 그룹)
+  syncBillingFlagOptions({hasPkg,hasShuttle,hasExtTB,hasMat,hasSci,hasSnack,hasCare,hasOT});
   if(!rows.length){document.getElementById('billing-tbody').innerHTML=`<tr><td colspan="12"><div class="empty-state text-muted text-sm">해당 조건 원생 없음</div></td></tr>`;document.getElementById('billing-class-summary').innerHTML='';return;}
   document.getElementById('billing-tbody').innerHTML=rows.map(({s,a})=>{
     const flags=[];
