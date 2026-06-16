@@ -3862,6 +3862,8 @@ function ensureChkStore(ym){
   return CY.checklists[ym];
 }
 function getCustomTypes(){ if(!CY.chkCustomTypes) CY.chkCustomTypes=[]; return CY.chkCustomTypes; }
+function getDeletedAuto(){ if(!CY.chkDeletedAuto) CY.chkDeletedAuto=[]; return CY.chkDeletedAuto; }
+function isAutoDeleted(id){ return getDeletedAuto().includes(id); }
 
 function buildChkItems(ym){
   const store=ensureChkStore(ym);
@@ -3869,6 +3871,7 @@ function buildChkItems(ym){
   let items=[];
   active.forEach(s=>{
     CHK_AUTO_TYPES.forEach(t=>{
+      if(isAutoDeleted(t.id)) return; // 삭제된 자동 항목은 제외
       if(t.match(s)){
         items.push({key:s.id+'__'+t.id, sid:s.id, s, typeId:t.id, cat:t.label, color:t.color, desc:t.desc(s), auto:true});
       }
@@ -3895,7 +3898,7 @@ function buildChkItems(ym){
 function chkTabList(ym){
   const items=buildChkItems(ym);
   const cats=[{id:'all',label:'전체'}];
-  CHK_AUTO_TYPES.forEach(t=>cats.push({id:t.id,label:t.label}));
+  CHK_AUTO_TYPES.forEach(t=>{ if(!isAutoDeleted(t.id)) cats.push({id:t.id,label:t.label}); });
   // 커스텀 고정 항목 종류
   getCustomTypes().forEach(ct=>cats.push({id:ct.id,label:ct.label}));
   // 수동(일회성) 항목 중 위에 없는 카테고리
@@ -4045,37 +4048,48 @@ function deleteManualChk(mid){
 
 function openChkTypeModal(){ renderChkTypeBody(); openModal('modal-chktype'); }
 function renderChkTypeBody(){
-  const autoRows=CHK_AUTO_TYPES.map(t=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><span>${t.label} <span class="tag" style="background:var(--yellow-dim);color:var(--yellow);font-size:10px;">자동·고정</span></span><span class="text-xs text-muted">아이 설정에서 자동 생성</span></div>`).join('');
+  const autoRows=CHK_AUTO_TYPES.filter(t=>!isAutoDeleted(t.id)).map(t=>{
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);">
+      <span><b>${t.label}</b></span>
+      <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;border:1px solid var(--red);color:var(--red);" onclick="deleteAutoType('${t.id}')">삭제</button>
+    </div>`;
+  }).join('');
   const custom=getCustomTypes();
-  const customRows=custom.length?custom.map(c=>{
+  const customRows=custom.map(c=>{
     const cnt=(c.members||[]).length;
     const names=(c.members||[]).map(sid=>{const s=S().find(x=>x.id===sid);return s?s.name:null;}).filter(Boolean).join(', ');
     return `<div style="padding:9px 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span><b>${c.label}</b> <span class="tag" style="background:var(--petamus-bg);color:var(--petamus);font-size:10px;">매월 고정</span></span>
-        <span style="display:flex;gap:6px;"><button class="btn btn-sm" style="padding:2px 8px;font-size:11px;" onclick="openChkMembers('${c.id}')">대상 원생 (${cnt})</button><button class="btn btn-sm" style="padding:2px 8px;font-size:11px;" onclick="deleteChkType('${c.id}')">🗑</button></span>
+        <span><b>${c.label}</b></span>
+        <span style="display:flex;gap:6px;"><button class="btn btn-sm" style="padding:2px 8px;font-size:11px;" onclick="openChkMembers('${c.id}')">대상 원생 (${cnt})</button><button class="btn btn-sm" style="padding:2px 8px;font-size:11px;border:1px solid var(--red);color:var(--red);" onclick="deleteChkType('${c.id}')">삭제</button></span>
       </div>
-      ${cnt?`<div class="text-xs text-muted" style="margin-top:4px;">${names}</div>`:'<div class="text-xs text-muted" style="margin-top:4px;color:var(--red);">대상 원생 미지정 — 지정해야 체크리스트에 뜹니다</div>'}
+      ${cnt?`<div class="text-xs text-muted" style="margin-top:4px;">${names}</div>`:'<div class="text-xs text-muted" style="margin-top:4px;color:var(--red);">대상 원생을 지정해야 체크리스트에 뜹니다</div>'}
     </div>`;
-  }).join(''):'<div class="text-xs text-muted" style="padding:7px 0;">추가된 항목 종류가 없습니다</div>';
+  }).join('');
+  const allRows = autoRows + customRows;
   document.getElementById('chktype-body').innerHTML=`
-    <div class="section-label">자동 항목 (기본 고정)</div>
-    <div class="text-sm text-muted" style="margin-bottom:6px;">아이 모달의 설정값에서 매월 자동으로 만들어집니다.</div>
-    <div>${autoRows}</div>
-    <div class="section-label" style="margin-top:16px;">직접 추가한 고정 항목</div>
-    <div class="text-sm text-muted" style="margin-bottom:6px;">항목을 만들고 '대상 원생'을 지정하면, 그 아이들에게 매월 자동으로 뜹니다. (예: 교육비 납입증명서 발급)</div>
-    <div>${customRows}</div>
-    <div style="display:flex;gap:8px;margin-top:12px;"><input type="text" id="newchk-type" placeholder="새 고정 항목명 (예: 교육비 납입증명서 발급)" style="flex:1;"><button class="btn" onclick="addChkType()">추가</button></div>`;
+    <div>${allRows || '<div class="text-xs text-muted" style="padding:7px 0;">항목이 없습니다. 아래에서 추가하세요.</div>'}</div>
+    <div style="display:flex;gap:8px;margin-top:14px;"><input type="text" id="newchk-type" placeholder="새 항목명 (예: 교육비 납입증명서 발급)" style="flex:1;"><button class="btn" onclick="addChkType()">추가</button></div>`;
 }
 function addChkType(){
   const v=document.getElementById('newchk-type').value.trim(); if(!v) return;
   getCustomTypes().push({id:'c'+Date.now(), label:v, members:[]});
   saveYearData(); renderChkTypeBody();
 }
+function deleteAutoType(id){
+  const t=CHK_AUTO_TYPES.find(x=>x.id===id);
+  if(!confirm(`'${t?t.label:id}' 항목을 삭제할까요?`)) return;
+  const d=getDeletedAuto();
+  if(!d.includes(id)) d.push(id);
+  saveYearData(); renderChkTypeBody(); renderSpecialList();
+  toast(`'${t?t.label:id}' 항목이 삭제되었습니다.`,'success',1800);
+}
 function deleteChkType(id){
+  const ct=getCustomTypes().find(c=>c.id===id);
   if(!confirm('이 고정 항목을 삭제할까요? 대상 원생 지정도 함께 지워집니다.')) return;
   CY.chkCustomTypes=getCustomTypes().filter(c=>c.id!==id);
-  saveYearData(); renderChkTypeBody();
+  saveYearData(); renderChkTypeBody(); renderSpecialList();
+  toast(`'${ct?ct.label:'항목'}'이(가) 삭제되었습니다.`,'success',1800);
 }
 
 // 커스텀 항목의 대상 원생 지정
