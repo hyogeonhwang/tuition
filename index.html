@@ -5605,6 +5605,7 @@ function renderMonthlyReport(){
 // CONSULT — 상담 일지
 // ══════════════════════════════════════════════
 let consultEditId = null;
+let _consultEditCreatedAt = null;
 let consultRows = []; // 현재 조회된 전체 행 (검색 필터링용)
 
 function getWeekRange(weekVal){
@@ -5698,6 +5699,16 @@ function detachConsultListener(){
   }
 }
 
+// 상담 입력 시각 포맷: 오늘이면 HH:MM, 아니면 MM/DD HH:MM
+function fmtConsultTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  if(isNaN(d)) return '';
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${hh}:${mm}`;
+}
+
 function renderConsultPage(){
   detachConsultListener();
 
@@ -5788,7 +5799,7 @@ function renderConsultTable(rows){
   }
   tbody.innerHTML = rows.map((r,i)=>`
     <tr>
-      <td style="font-size:12px;white-space:nowrap;">${r.date?.replace(/-/g,'.')}</td>
+      <td style="font-size:12px;white-space:nowrap;">${r.date?.replace(/-/g,'.')||''}${(r.ts||r.createdAt)?`<br><span style="font-size:10px;color:var(--text3);">🕐 ${fmtConsultTime(r.ts||r.createdAt)}</span>`:''}</td>
       <td style="font-size:12px;white-space:nowrap;">${r.contact||''}</td>
       <td style="font-size:12px;white-space:nowrap;">${r.source||''}</td>
       <td style="font-size:12px;">${r.receiver||''}</td>
@@ -5859,6 +5870,7 @@ function openConsultModal(id){
     delBtn.style.display = '';
     firebase.database().ref('consult/'+id).once('value', snap=>{
       const r = snap.val()||{};
+      _consultEditCreatedAt = r.createdAt || r.ts || null; // 최초 입력시각 보존용
       document.getElementById('c-date').value = r.date||'';
       document.getElementById('c-receiver').value = r.receiver||'';
       document.getElementById('c-contact').value = r.contact||'전화';
@@ -5875,6 +5887,7 @@ function openConsultModal(id){
   } else {
     title.textContent = '상담 입력';
     delBtn.style.display = 'none';
+    _consultEditCreatedAt = null; // 신규는 최초시각 없음 → 저장 시 현재시각
     // 기본값: 오늘 날짜 (KST)
     const today = kstDateStr(0);
     document.getElementById('c-date').value = today;
@@ -5932,7 +5945,8 @@ function saveConsult(){
     content:  document.getElementById('c-content').value.trim(),
     meetdate: document.getElementById('c-meetdate').value,
     testdate: document.getElementById('c-testdate').value,
-    ts: Date.now()
+    createdAt: _consultEditCreatedAt || Date.now(), // 최초 입력시각 (수정해도 보존)
+    ts: Date.now() // 최종 수정시각
   };
   const ref = consultEditId
     ? firebase.database().ref('consult/'+consultEditId)
