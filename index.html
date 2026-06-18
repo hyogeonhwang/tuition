@@ -786,19 +786,19 @@ tr.inactive td{opacity:.38;}
         <div class="table-wrap" style="max-height:55vh;overflow-y:auto;">
           <table>
             <thead><tr>
-              <th style="min-width:70px;">날짜</th>
-              <th>Contact</th>
-              <th>알게된 경로</th>
-              <th>수신인</th>
-              <th>구분</th>
-              <th>원아명</th>
-              <th style="min-width:40px;">나이</th>
-              <th style="min-width:30px;">성별</th>
-              <th style="min-width:110px;">연락처</th>
-              <th style="min-width:200px;">상담내용</th>
-              <th style="min-width:90px;">대면상담일</th>
-              <th style="min-width:90px;">테스트일정</th>
-              <th></th>
+              <th style="min-width:70px;position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">날짜</th>
+              <th style="position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">Contact</th>
+              <th style="position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">알게된 경로</th>
+              <th style="position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">수신인</th>
+              <th style="position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">구분</th>
+              <th style="position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">원아명</th>
+              <th style="min-width:40px;position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">나이</th>
+              <th style="min-width:30px;position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">성별</th>
+              <th style="min-width:110px;position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">연락처</th>
+              <th style="min-width:200px;position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">상담내용</th>
+              <th style="min-width:90px;position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">대면상담일</th>
+              <th style="min-width:90px;position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;">테스트일정</th>
+              <th style="position:sticky;top:0;background:var(--surface2,#f0eff8);z-index:5;"></th>
             </tr></thead>
             <tbody id="consult-tbody"></tbody>
           </table>
@@ -6423,7 +6423,11 @@ function closeRowAddPopup(){
   if(pop) pop.remove();
   _rowMenuSid = null;
   _rowMenuBtn = null;
-  if(_rowMenuCloseFn){ document.removeEventListener('click', _rowMenuCloseFn); _rowMenuCloseFn = null; }
+  if(_rowMenuCloseFn){
+    document.removeEventListener('mousedown', _rowMenuCloseFn);
+    document.removeEventListener('click', _rowMenuCloseFn);
+    _rowMenuCloseFn = null;
+  }
 }
 
 function toggleRowAddMenu(sid, btn) {
@@ -6482,7 +6486,7 @@ function toggleRowAddMenu(sid, btn) {
           <span>${it.label}</span>
           <span class="mono" style="color:var(--text2);font-size:11px;">${won(it.amount)}</span>
         </button>`).join('')}
-      <button onclick="rowAddCustom('${sid}')"
+      <button onclick="event.stopPropagation();rowAddCustom('${sid}')"
         class="btn btn-secondary btn-sm"
         style="width:100%;margin-top:2px;text-align:left;justify-content:flex-start;border-style:dashed;">
         + 직접 입력
@@ -6502,18 +6506,21 @@ function toggleRowAddMenu(sid, btn) {
   popup.style.top = top + 'px';
   popup.style.left = left + 'px';
 
-  // 외부 클릭 닫기 (전역 참조로 보관 — rowAddCustom에서 제거 가능하게)
+  // 외부 클릭 닫기 — 좌표 기반 판정(innerHTML 교체에도 안전), mousedown 사용
   setTimeout(()=>{
     _rowMenuCloseFn = function(e){
       const pop = document.getElementById('row-add-popup');
-      if(pop && !pop.contains(e.target) && e.target !== btn){
-        pop.remove();
-        _rowMenuSid = null;
-        document.removeEventListener('click', _rowMenuCloseFn);
-        _rowMenuCloseFn = null;
-      }
+      if(!pop) return;
+      // 클릭 좌표가 팝업 영역 안이면 무시 (내부 요소가 교체돼도 안전)
+      const r = pop.getBoundingClientRect();
+      const inside = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
+      if(inside || e.target===btn) return;
+      pop.remove();
+      _rowMenuSid = null;
+      document.removeEventListener('mousedown', _rowMenuCloseFn);
+      _rowMenuCloseFn = null;
     };
-    document.addEventListener('click', _rowMenuCloseFn);
+    document.addEventListener('mousedown', _rowMenuCloseFn);
   }, 0);
 }
 
@@ -6524,30 +6531,38 @@ function rowAddItem(sid, item, amount) {
 }
 
 function rowAddCustom(sid) {
+  console.log('[직접입력] rowAddCustom 호출됨, sid=', sid);
   const s = S().find(x=>x.id===sid);
-  if(!s) return;
-  const popup = document.getElementById('row-add-popup');
-  if(!popup) return;
-  // 외부 클릭 닫기 리스너 제거 (폼 입력 중 닫히지 않도록)
-  if(_rowMenuCloseFn){ document.removeEventListener('click', _rowMenuCloseFn); _rowMenuCloseFn = null; }
-  // 팝업 안에 직접 입력 폼을 인라인으로 표시 (별도 섹션에 의존하지 않음)
-  popup.innerHTML = `
-    <div style="font-size:11px;font-weight:600;color:var(--text3);padding:2px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:6px;">
-      ${s.name} — 직접 입력
-    </div>
-    <div style="padding:0 8px 4px;">
-      <input id="custom-ot-item" type="text" placeholder="항목명 (예: AR비용)"
-        style="width:100%;font-size:12px;padding:6px 8px;margin-bottom:6px;box-sizing:border-box;">
-      <input id="custom-ot-amount" type="number" min="0" step="10000" placeholder="금액"
-        style="width:100%;font-size:12px;padding:6px 8px;margin-bottom:8px;box-sizing:border-box;">
-      <div style="display:flex;gap:6px;">
-        <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="closeRowAddPopup()">취소</button>
-        <button class="btn btn-primary btn-sm" style="flex:1;" onclick="rowAddCustomConfirm('${sid}')">추가</button>
+  if(!s){ console.log('[직접입력] 학생 못찾음'); return; }
+  // 기존 + 팝업과 리스너 완전 정리
+  closeRowAddPopup();
+  // 독립 모달로 직접 입력 (팝업 인라인 교체 방식의 닫힘 문제 회피)
+  const old = document.getElementById('custom-ot-modal');
+  if(old) old.remove();
+  const modal = document.createElement('div');
+  modal.id = 'custom-ot-modal';
+  modal.className = 'modal-overlay open';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(26,31,54,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;opacity:1;pointer-events:all;';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:360px;background:var(--surface,#fff);border-radius:12px;transform:none;">
+      <div class="modal-header">
+        <span>${s.name} — 추가비용 직접 입력</span>
+        <button class="modal-close" onclick="document.getElementById('custom-ot-modal').remove()">✕</button>
       </div>
-    </div>
-  `;
-  setTimeout(()=>{ document.getElementById('custom-ot-item')?.focus(); }, 0);
-  // 엔터로 추가
+      <div class="modal-body">
+        <div class="form-row"><label>항목명</label>
+          <input id="custom-ot-item" type="text" placeholder="예: AR비용" style="width:100%;box-sizing:border-box;padding:8px;font-size:13px;border-radius:8px;"></div>
+        <div class="form-row"><label>금액</label>
+          <input id="custom-ot-amount" type="number" min="0" step="10000" placeholder="금액" style="width:100%;box-sizing:border-box;padding:8px;font-size:13px;border-radius:8px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('custom-ot-modal').remove()">취소</button>
+        <button class="btn btn-primary" onclick="rowAddCustomConfirm('${sid}')">추가</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  console.log('[직접입력] 모달 생성 완료, DOM에 있나?', !!document.getElementById('custom-ot-modal'));
+  setTimeout(()=>{ document.getElementById('custom-ot-item')?.focus(); }, 30);
   const amtEl = document.getElementById('custom-ot-amount');
   if(amtEl) amtEl.addEventListener('keydown', e=>{ if(e.key==='Enter') rowAddCustomConfirm(sid); });
 }
@@ -6558,6 +6573,8 @@ function rowAddCustomConfirm(sid) {
   const item = (itemEl?.value||'').trim() || '기타';
   const amount = parseInt(amtEl?.value) || 0;
   addOnetimeRow(sid, item, amount);
+  const m = document.getElementById('custom-ot-modal');
+  if(m) m.remove();
   closeRowAddPopup();
   renderBillingTable();
   toast(`${S().find(x=>x.id===sid)?.name} — ${item} ${won(amount)} 추가됨`);
