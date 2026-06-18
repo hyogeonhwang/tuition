@@ -2313,20 +2313,39 @@ function renderSpotCare(){
           <span>합계 ${totalCnt}회</span><span>${won(totalCnt*SPOT_CARE_FEE)}</span></div>`;
     }
   }
-  // 날짜별 리스트
+  // 학생별로 묶어서 표시 (한 아이 아래에 날짜들)
   const listEl = document.getElementById('spotcare-list');
   if(listEl){
     if(!rows.length){
       listEl.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0;">기록 없음</div>';
     } else {
-      listEl.innerHTML = rows.map(r=>{
-        const s = S().find(x=>x.id===r.sid);
-        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--border);">
-          <div style="font-size:13px;"><span style="color:var(--text3);">${r.date}</span> &nbsp; <strong>${s?s.name:r.sid}</strong>${s&&s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''} ${s&&s.cls?`<span style="color:var(--text3);font-size:11px;">· ${s.cls}</span>`:''}</div>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:12px;color:var(--text2);">${won(SPOT_CARE_FEE)}</span>
-            <button class="btn btn-sm" style="border:1px solid var(--red);color:var(--red);" onclick="removeSpotCare('${r.id}')">삭제</button>
+      // sid별 그룹화 (날짜 내림차순)
+      const groups = {};
+      rows.forEach(r=>{ (groups[r.sid] = groups[r.sid]||[]).push(r); });
+      // 학생 정렬: 횟수 많은 순 → 이름순
+      const sids = Object.keys(groups).sort((a,b)=>{
+        const d = groups[b].length - groups[a].length;
+        if(d!==0) return d;
+        const sa=S().find(x=>x.id===a), sb=S().find(x=>x.id===b);
+        return (sa?.name||'').localeCompare(sb?.name||'','ko');
+      });
+      listEl.innerHTML = sids.map(sid=>{
+        const s = S().find(x=>x.id===sid);
+        const recs = groups[sid].sort((a,b)=> b.date.localeCompare(a.date));
+        const cnt = recs.length;
+        const chips = recs.map(r=>{
+          const md = r.date.slice(5).replace('-','/'); // MM/DD
+          return `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface2,#f0eff8);border-radius:14px;padding:3px 8px 3px 10px;font-size:12px;">
+            ${md}
+            <span onclick="removeSpotCare('${r.id}')" title="이 날짜 삭제" style="cursor:pointer;color:var(--red);font-weight:700;font-size:13px;line-height:1;">×</span>
+          </span>`;
+        }).join('');
+        return `<div style="padding:9px 10px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="font-size:13px;"><strong>${s?s.name:sid}</strong>${s&&s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''}${s&&s.cls?` <span style="color:var(--text3);font-size:11px;">· ${s.cls}</span>`:''}</div>
+            <div style="font-size:12px;font-weight:600;color:var(--accent2);white-space:nowrap;">${cnt}회 · ${won(cnt*SPOT_CARE_FEE)}</div>
           </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">${chips}</div>
         </div>`;
       }).join('');
     }
