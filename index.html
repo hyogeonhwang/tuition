@@ -233,7 +233,7 @@ tr.inactive td{opacity:.38;}
 (function(){
   try{
     var saved = sessionStorage.getItem('current_page');
-    var valid = ['billing','students','spotcare','refund','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
+    var valid = ['billing','students','spotcare','refund','camp','special','monthly','consult','ag-home','master','textbook','sms','classconfig','yearend','calc'];
     if(saved && valid.indexOf(saved)>=0){
       var st = document.createElement('style');
       st.id = '_early-page-style';
@@ -242,7 +242,7 @@ tr.inactive td{opacity:.38;}
         '#page-'+saved+'{display:block!important;}';
       document.head.appendChild(st);
       // 상단 타이틀도 첫 페인트부터 맞춰 깜빡임 방지
-      var TITLES = {billing:'월별 청구 생성', students:'원생 관리', spotcare:'일시돌봄 기록', refund:'환불 관리', special:'특이사항 체크',
+      var TITLES = {billing:'월별 청구 생성', students:'원생 관리', spotcare:'일시돌봄 기록', refund:'환불 관리', camp:'캠프 관리', special:'특이사항 체크',
         monthly:'신규·퇴원 관리', consult:'상담 일지', 'ag-home':'행정 업무 가이드',
         master:'단가 설정', textbook:'외부교재비 설정', sms:'SMS 템플릿',
         classconfig:'반 목록 관리', yearend:'학년도 관리', calc:'계산기'};
@@ -291,6 +291,7 @@ tr.inactive td{opacity:.38;}
       <div class="nav-item" onclick="showPage('students')"><span class="nav-icon">👦</span>원생 관리</div>
       <div class="nav-item" onclick="showPage('spotcare')"><span class="nav-icon">🧸</span>일시돌봄 기록</div>
       <div class="nav-item" onclick="showPage('refund')"><span class="nav-icon">💸</span>환불 관리</div>
+      <div class="nav-item" onclick="showPage('camp')"><span class="nav-icon">🏕️</span>캠프 관리</div>
       <div class="nav-item" onclick="showPage('special')"><span class="nav-icon">⚠️</span>특이사항 체크</div>
     </div>
     <div class="nav-section" onclick="toggleNavGroup('nav-report')">보고<span id="nav-report-arrow">▾</span></div>
@@ -322,7 +323,7 @@ tr.inactive td{opacity:.38;}
         var sp = '';
         try{ sp = sessionStorage.getItem('current_page')||''; }catch(e){}
         var T = {dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
-          spotcare:'일시돌봄 기록', refund:'환불 관리',
+          spotcare:'일시돌봄 기록', refund:'환불 관리', camp:'캠프 관리',
           special:'특이사항 체크', monthly:'신규·퇴원 관리', consult:'상담 일지',
           'ag-home':'행정 업무 가이드', master:'단가 설정', textbook:'외부교재비 설정',
           sms:'SMS 템플릿', classconfig:'반 목록 관리', yearend:'학년도 관리', calc:'계산기'};
@@ -372,6 +373,23 @@ tr.inactive td{opacity:.38;}
               <div id="ot-summary"></div>
             </div>
           </div>
+        </div>
+      </div>
+      <!-- 공지 / 메모 (하단) -->
+      <div class="grid2" id="dash-notice-memo" style="margin-top:16px;">
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div class="card-title">📢 공지</div>
+            <div style="flex:1;"></div>
+            <input type="text" id="dash-notice-input" placeholder="공지 입력 후 Enter (예: 6/25 청구 마감)" onkeydown="if(event.key==='Enter')addDashNotice()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);flex:1;max-width:340px;">
+            <button class="btn btn-primary btn-sm" onclick="addDashNotice()">추가</button>
+          </div>
+          <div id="dash-notice-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:10px;">📝 메모</div>
+          <textarea id="dash-memo" oninput="saveDashMemoDebounced()" placeholder="자유 메모 (자동 저장)" style="width:100%;box-sizing:border-box;min-height:90px;resize:vertical;font-size:13px;padding:10px;border-radius:8px;border:1px solid var(--border);font-family:inherit;"></textarea>
+          <div id="dash-memo-status" class="text-xs text-muted" style="margin-top:4px;height:14px;"></div>
         </div>
       </div>
     </div>
@@ -558,6 +576,22 @@ tr.inactive td{opacity:.38;}
       <div class="card">
         <div id="refund-list"></div>
       </div>
+      </div>
+    </div>
+
+    <!-- CAMP -->
+    <div class="page" id="page-camp">
+      <div style="max-width:1050px;">
+      <div class="info-box">🏕️ 여름·겨울 캠프 등 단기 특강을 정규 수납과 <b>별도로</b> 관리합니다. 외부 참가자도 정규 원생과 섞이지 않습니다.</div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        <select id="camp-select" onchange="renderCampDetail()" style="font-size:14px;padding:7px 12px;border-radius:8px;min-width:200px;"></select>
+        <button class="btn btn-primary btn-sm" onclick="openCampModal()">＋ 새 캠프</button>
+        <button class="btn btn-secondary btn-sm" onclick="editCurrentCamp()" id="camp-edit-btn" style="display:none;">캠프 정보 수정</button>
+        <button class="btn btn-secondary btn-sm" onclick="deleteCurrentCamp()" id="camp-del-btn" style="display:none;color:var(--red);border-color:var(--red);">캠프 삭제</button>
+      </div>
+
+      <div id="camp-detail"></div>
       </div>
     </div>
 
@@ -1600,6 +1634,10 @@ async function loadYearDataFromFB(y){
         data.spotCare = Object.values(data.spotCare);
       if(data.refunds && !Array.isArray(data.refunds))
         data.refunds = Object.values(data.refunds);
+      if(data.camps && !Array.isArray(data.camps))
+        data.camps = Object.values(data.camps);
+      if(data.dashNotices && !Array.isArray(data.dashNotices))
+        data.dashNotices = Object.values(data.dashNotices);
       // freq 마이그레이션: 'kelpie' → '3'
       (data.students||[]).forEach(st=>{ if(st.freq==='kelpie') st.freq='3'; });
       // care 마이그레이션: '1회' → '주1회' (1회성 옵션 제거로 인한 보정)
@@ -1909,7 +1947,7 @@ function loadSampleTB(){
 }
 const PAGE_TITLES={
   dashboard:'대시보드', billing:'월별 청구 생성', students:'원생 관리',
-  spotcare:'일시돌봄 기록', refund:'환불 관리',
+  spotcare:'일시돌봄 기록', refund:'환불 관리', camp:'캠프 관리',
   special:'특이사항 체크', master:'단가 설정', textbook:'외부교재비 설정',
   yearend:'학년도 관리',
   calc:'계산기', sms:'SMS 템플릿', classconfig:'반 목록 관리', monthly:'신규·퇴원 관리', consult:'상담 일지',
@@ -1928,6 +1966,7 @@ function showPage(p){
   if(p==='students')renderStudentTable();
   if(p==='spotcare')initSpotCarePage();
   if(p==='refund')initRefundPage();
+  if(p==='camp')initCampPage();
   if(p==='special')renderSpecialList('all');
   if(p==='textbook')renderTextbookTable();
   if(p==='yearend')renderArchiveList();
@@ -1952,7 +1991,56 @@ function showPage(p){
 // ══════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════
+// 대시보드 공지/메모 (수납앱 자체 — altiora-tuition에 저장)
+function getDashNotices(){ if(!CY.dashNotices) CY.dashNotices=[]; return CY.dashNotices; }
+function addDashNotice(){
+  const inp=document.getElementById('dash-notice-input');
+  const v=(inp?.value||'').trim();
+  if(!v) return;
+  getDashNotices().unshift({ id:'n'+Date.now(), text:v, ts:Date.now() });
+  if(inp) inp.value='';
+  saveYearData();
+  renderDashNotices();
+}
+function deleteDashNotice(id){
+  CY.dashNotices = getDashNotices().filter(n=>n.id!==id);
+  saveYearData();
+  renderDashNotices();
+}
+function renderDashNotices(){
+  const el=document.getElementById('dash-notice-list');
+  if(!el) return;
+  const list=getDashNotices();
+  if(!list.length){ el.innerHTML='<div class="text-sm text-muted" style="padding:6px 0;">등록된 공지가 없습니다.</div>'; return; }
+  el.innerHTML=list.map(n=>{
+    const d=new Date(n.ts);
+    const dt=isNaN(d)?'':`${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--accent2);font-weight:700;">·</span>
+      <div style="flex:1;font-size:13px;">${escapeHtml(n.text)} ${dt?`<span style="color:var(--text3);font-size:11px;">${dt}</span>`:''}</div>
+      <span onclick="deleteDashNotice('${n.id}')" style="cursor:pointer;color:var(--red);font-size:13px;" title="삭제">✕</span>
+    </div>`;
+  }).join('');
+}
+let _dashMemoTimer=null;
+function saveDashMemoDebounced(){
+  const st=document.getElementById('dash-memo-status');
+  if(st) st.textContent='저장 중...';
+  clearTimeout(_dashMemoTimer);
+  _dashMemoTimer=setTimeout(()=>{
+    CY.dashMemo=document.getElementById('dash-memo')?.value||'';
+    saveYearData();
+    if(st){ st.textContent='저장됨 ✓'; setTimeout(()=>{ if(st) st.textContent=''; },1500); }
+  }, 600);
+}
+function renderDashMemoNotice(){
+  renderDashNotices();
+  const ta=document.getElementById('dash-memo');
+  if(ta) ta.value = CY.dashMemo||'';
+}
+
 function renderDashboard(viewMonth){
+  renderDashMemoNotice();
   const now = new Date();
   // 조회 월 관리 — m 먼저 확정
   if(viewMonth !== undefined) dashViewMonth = viewMonth;
@@ -2852,6 +2940,289 @@ function checkRefundDeductReflection(ymKey){
 
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ══════════════ 캠프 관리 (정규와 완전 분리) ══════════════
+let _currentCampId = null;
+
+function getCamps(){ if(!CY.camps) CY.camps=[]; return CY.camps; }
+
+function initCampPage(){
+  const camps = getCamps();
+  const sel = document.getElementById('camp-select');
+  if(sel){
+    if(!camps.length){
+      sel.innerHTML = '<option value="">등록된 캠프가 없습니다 — 새 캠프를 만드세요</option>';
+      _currentCampId = null;
+    } else {
+      // 최신순
+      const sorted = camps.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+      if(!_currentCampId || !camps.find(c=>c.id===_currentCampId)) _currentCampId = sorted[0].id;
+      sel.innerHTML = sorted.map(c=>`<option value="${c.id}" ${c.id===_currentCampId?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+    }
+  }
+  renderCampDetail();
+}
+
+function openCampModal(editId){
+  const editing = editId ? getCamps().find(c=>c.id===editId) : null;
+  const old=document.getElementById('camp-modal'); if(old) old.remove();
+  const modal=document.createElement('div');
+  modal.id='camp-modal'; modal.className='modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <span>${editing?'캠프 정보 수정':'새 캠프 만들기'}</span>
+        <button class="modal-close" onclick="document.getElementById('camp-modal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row"><label>캠프명</label>
+          <input id="camp-name" type="text" value="${editing?escapeHtml(editing.name):''}" placeholder="예: 2026 여름캠프" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+        <div class="form-row" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:130px;"><label>기간 시작</label><br>
+            <input id="camp-start" type="text" value="${editing?.start||''}" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+          <div style="flex:1;min-width:130px;"><label>기간 종료</label><br>
+            <input id="camp-end" type="text" value="${editing?.end||''}" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+        </div>
+        <div class="form-row"><label>1인 기본 금액</label>
+          <input id="camp-fee" type="number" step="10000" value="${editing?.fee||''}" placeholder="예: 1200000" style="width:180px;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+        <div class="form-row"><label>메모 (선택)</label>
+          <input id="camp-memo" type="text" value="${editing?escapeHtml(editing.memo||''):''}" placeholder="예: 페타무스 / 2주 과정" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('camp-modal').remove()">취소</button>
+        <button class="btn btn-primary" onclick="saveCamp('${editId||''}')">저장</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function saveCamp(editId){
+  const name=document.getElementById('camp-name').value.trim();
+  if(!name){ toast('캠프명을 입력하세요','warn'); return; }
+  const rec = {
+    id: editId || ('camp'+Date.now()),
+    name,
+    start: document.getElementById('camp-start').value.trim(),
+    end: document.getElementById('camp-end').value.trim(),
+    fee: parseInt(document.getElementById('camp-fee').value)||0,
+    memo: document.getElementById('camp-memo').value.trim(),
+    createdAt: editId ? undefined : new Date().toISOString(),
+    members: []
+  };
+  const camps=getCamps();
+  if(editId){
+    const idx=camps.findIndex(c=>c.id===editId);
+    if(idx>=0){ rec.createdAt=camps[idx].createdAt; rec.members=camps[idx].members||[]; camps[idx]=rec; }
+  } else {
+    camps.push(rec);
+    _currentCampId = rec.id;
+  }
+  saveYearData();
+  document.getElementById('camp-modal').remove();
+  initCampPage();
+  toast('캠프 저장됨','success');
+}
+
+function editCurrentCamp(){ if(_currentCampId) openCampModal(_currentCampId); }
+
+function deleteCurrentCamp(){
+  const c=getCamps().find(x=>x.id===_currentCampId);
+  if(!c) return;
+  if(!confirm(`'${c.name}' 캠프를 삭제할까요? 참가자 명단도 함께 삭제됩니다.`)) return;
+  CY.camps = getCamps().filter(x=>x.id!==_currentCampId);
+  _currentCampId = null;
+  saveYearData();
+  initCampPage();
+  toast('캠프 삭제됨','success',1500);
+}
+
+function renderCampDetail(){
+  const sel=document.getElementById('camp-select');
+  if(sel) _currentCampId = sel.value || _currentCampId;
+  const el=document.getElementById('camp-detail');
+  const editBtn=document.getElementById('camp-edit-btn');
+  const delBtn=document.getElementById('camp-del-btn');
+  if(!el) return;
+  const camp=getCamps().find(c=>c.id===_currentCampId);
+  if(!camp){
+    el.innerHTML='<div class="card"><div class="text-sm text-muted">왼쪽 위 「＋ 새 캠프」로 캠프를 먼저 만드세요.</div></div>';
+    if(editBtn) editBtn.style.display='none';
+    if(delBtn) delBtn.style.display='none';
+    return;
+  }
+  if(editBtn) editBtn.style.display='inline-flex';
+  if(delBtn) delBtn.style.display='inline-flex';
+  const members=camp.members||[];
+  const total=members.reduce((a,m)=>a+(m.fee||0),0);
+  const paid=members.filter(m=>m.paid).reduce((a,m)=>a+(m.fee||0),0);
+  const paidCnt=members.filter(m=>m.paid).length;
+  const period = (camp.start||camp.end) ? `${camp.start||''} ~ ${camp.end||''}` : '기간 미정';
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:flex-start;">
+        <div>
+          <div style="font-size:17px;font-weight:700;">${escapeHtml(camp.name)}</div>
+          <div class="text-sm text-muted" style="margin-top:3px;">📅 ${period}${camp.memo?' · '+escapeHtml(camp.memo):''}</div>
+          <div class="text-sm text-muted" style="margin-top:2px;">1인 기본 ${won(camp.fee||0)}</div>
+        </div>
+        <div style="display:flex;gap:18px;text-align:right;">
+          <div><div class="text-xs text-muted">참가</div><div style="font-size:18px;font-weight:700;">${members.length}명</div></div>
+          <div><div class="text-xs text-muted">수납</div><div style="font-size:18px;font-weight:700;color:#16A34A;">${paidCnt}명</div></div>
+          <div><div class="text-xs text-muted">수납액 / 총액</div><div style="font-size:15px;font-weight:700;color:var(--accent2);">${won(paid)} <span style="color:var(--text3);font-size:12px;">/ ${won(total)}</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <div class="card-title">참가자 명단</div>
+        <div style="flex:1;"></div>
+        <input type="text" id="camp-mem-search" placeholder="🔍 이름 검색" oninput="renderCampMembers()" style="font-size:13px;padding:6px 10px;border-radius:8px;width:150px;">
+        <button class="btn btn-primary btn-sm" onclick="openCampMemberModal()">＋ 참가자 추가</button>
+      </div>
+      <div id="camp-members"></div>
+    </div>`;
+  renderCampMembers();
+}
+
+function renderCampMembers(){
+  const camp=getCamps().find(c=>c.id===_currentCampId);
+  const el=document.getElementById('camp-members');
+  if(!el||!camp) return;
+  const q=(document.getElementById('camp-mem-search')?.value||'').trim().toLowerCase();
+  let members=(camp.members||[]).slice();
+  if(q) members=members.filter(m=>(m.name||'').toLowerCase().includes(q));
+  if(!members.length){ el.innerHTML='<div class="text-sm text-muted" style="padding:8px 0;">참가자가 없습니다. 「＋ 참가자 추가」로 등록하세요.</div>'; return; }
+  el.innerHTML = `<table style="width:100%;font-size:13px;"><thead><tr style="background:var(--surface2);">
+    <th style="text-align:left;padding:8px;">이름</th>
+    <th style="text-align:left;padding:8px;">구분</th>
+    <th style="text-align:left;padding:8px;">연락처</th>
+    <th style="text-align:right;padding:8px;">금액</th>
+    <th style="text-align:center;padding:8px;">납부</th>
+    <th style="padding:8px;"></th></tr></thead><tbody>` +
+    members.map(m=>{
+      const typeBadge = m.linkedSid
+        ? '<span style="background:#DBEAFE;color:#1E40AF;padding:2px 7px;border-radius:10px;font-size:11px;">기존원생</span>'
+        : '<span style="background:#F3F4F6;color:#374151;padding:2px 7px;border-radius:10px;font-size:11px;">외부</span>';
+      const paidCell = m.paid
+        ? `<span onclick="toggleCampPaid('${m.id}')" style="cursor:pointer;color:#16A34A;font-weight:600;" title="클릭하여 미납으로">✔ 완납</span>`
+        : `<span onclick="toggleCampPaid('${m.id}')" style="cursor:pointer;color:#D97706;font-weight:600;" title="클릭하여 완납으로">⏳ 미납</span>`;
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;font-weight:600;">${escapeHtml(m.name)}</td>
+        <td style="padding:8px;">${typeBadge}</td>
+        <td style="padding:8px;">${escapeHtml(m.phone||'')}</td>
+        <td style="padding:8px;text-align:right;font-weight:700;" class="mono">${won(m.fee||0)}</td>
+        <td style="padding:8px;text-align:center;">${paidCell}</td>
+        <td style="padding:8px;white-space:nowrap;">
+          <span onclick="openCampMemberModal('${m.id}')" style="cursor:pointer;color:var(--accent2);font-size:12px;margin-right:8px;">수정</span>
+          <span onclick="deleteCampMember('${m.id}')" style="cursor:pointer;color:var(--red);font-size:12px;">삭제</span>
+        </td></tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+function openCampMemberModal(editId){
+  const camp=getCamps().find(c=>c.id===_currentCampId);
+  if(!camp) return;
+  const editing = editId ? (camp.members||[]).find(m=>m.id===editId) : null;
+  const old=document.getElementById('camp-mem-modal'); if(old) old.remove();
+  const modal=document.createElement('div');
+  modal.id='camp-mem-modal'; modal.className='modal-overlay open';
+  modal.innerHTML=`
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-header">
+        <span>${editing?'참가자 수정':'참가자 추가'}</span>
+        <button class="modal-close" onclick="document.getElementById('camp-mem-modal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row"><label>이름</label>
+          <div style="position:relative;">
+            <input id="cm-name" type="text" autocomplete="off" value="${editing?escapeHtml(editing.name):''}" placeholder="이름 입력 (기존 원생은 검색됨)"
+              oninput="filterCampStudents()" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;">
+            <input type="hidden" id="cm-linked" value="${editing?.linkedSid||''}">
+            <div id="cm-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:60;background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;margin-top:2px;max-height:200px;overflow-y:auto;box-shadow:0 4px 14px rgba(0,0,0,.12);"></div>
+          </div></div>
+        <div class="form-row"><label>연락처</label>
+          <input id="cm-phone" type="text" value="${editing?escapeHtml(editing.phone||''):''}" placeholder="010-0000-0000" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+        <div class="form-row"><label>금액</label>
+          <input id="cm-fee" type="number" step="10000" value="${editing?editing.fee:(camp.fee||'')}" placeholder="금액" style="width:180px;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;">
+          <div class="text-xs text-muted" style="margin-top:3px;">기본 금액 자동 입력 · 형제할인 등은 직접 수정</div></div>
+        <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input id="cm-paid" type="checkbox" ${editing?.paid?'checked':''} style="width:16px;height:16px;"> 납부 완료</label></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('camp-mem-modal').remove()">취소</button>
+        <button class="btn btn-primary" onclick="saveCampMember('${editId||''}')">저장</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  if(!window._campMemOutsideBound){
+    window._campMemOutsideBound=true;
+    document.addEventListener('click',function(e){
+      const box=document.getElementById('cm-suggest'); const sc=document.getElementById('cm-name');
+      if(box && box.style.display!=='none' && !box.contains(e.target) && e.target!==sc) box.style.display='none';
+    });
+  }
+}
+
+function filterCampStudents(){
+  const sch=document.getElementById('cm-name'); const box=document.getElementById('cm-suggest');
+  if(!sch||!box) return;
+  const q=(sch.value||'').trim().toLowerCase();
+  document.getElementById('cm-linked').value='';
+  if(!q){ box.style.display='none'; return; }
+  const list=S().filter(s=>s.brand==='petamus' && ((s.name||'').toLowerCase().includes(q)||(s.ename||'').toLowerCase().includes(q))).slice(0,20);
+  if(!list.length){ box.style.display='none'; return; }
+  box.innerHTML=list.map(s=>`<div onclick="selectCampStudent('${s.id}')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><strong>${s.name}</strong>${s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''} <span style="color:var(--text3);font-size:11px;">· ${s.cls}</span></div>`).join('');
+  box.style.display='block';
+}
+function selectCampStudent(sid){
+  const s=S().find(x=>x.id===sid); if(!s) return;
+  document.getElementById('cm-name').value=s.name;
+  document.getElementById('cm-linked').value=sid;
+  if(s.phone){ const p=document.getElementById('cm-phone'); if(p&&!p.value) p.value=s.phone; }
+  document.getElementById('cm-suggest').style.display='none';
+}
+
+function saveCampMember(editId){
+  const camp=getCamps().find(c=>c.id===_currentCampId);
+  if(!camp) return;
+  const name=document.getElementById('cm-name').value.trim();
+  if(!name){ toast('이름을 입력하세요','warn'); return; }
+  const rec={
+    id: editId || ('cm'+Date.now()),
+    name,
+    linkedSid: document.getElementById('cm-linked').value||null,
+    phone: document.getElementById('cm-phone').value.trim(),
+    fee: parseInt(document.getElementById('cm-fee').value)||0,
+    paid: document.getElementById('cm-paid').checked
+  };
+  if(!camp.members) camp.members=[];
+  if(editId){
+    const idx=camp.members.findIndex(m=>m.id===editId);
+    if(idx>=0) camp.members[idx]=rec;
+  } else camp.members.push(rec);
+  saveYearData();
+  document.getElementById('camp-mem-modal').remove();
+  renderCampDetail();
+  toast('참가자 저장됨','success',1500);
+}
+
+function toggleCampPaid(mid){
+  const camp=getCamps().find(c=>c.id===_currentCampId); if(!camp) return;
+  const m=(camp.members||[]).find(x=>x.id===mid); if(!m) return;
+  m.paid=!m.paid;
+  saveYearData();
+  renderCampDetail();
+}
+function deleteCampMember(mid){
+  const camp=getCamps().find(c=>c.id===_currentCampId); if(!camp) return;
+  const m=(camp.members||[]).find(x=>x.id===mid);
+  if(!confirm(`'${m?m.name:'참가자'}'를 명단에서 삭제할까요?`)) return;
+  camp.members=(camp.members||[]).filter(x=>x.id!==mid);
+  saveYearData();
+  renderCampDetail();
+  toast('삭제됨','success',1500);
+}
+
 // 교습비 실제 청구액 — 셀 표시와 합계가 똑같이 쓰는 단일 기준
 // override > (차감/형제할인 반영) 순. 셀 표시 로직(2490대)과 반드시 동일하게 유지.
 function effTuition(s, a){
@@ -3671,18 +4042,25 @@ function updateBrandFields(){
     const ptItems = Object.entries(fi).filter(([k,v])=>v.brand==='petamus'&&v.type==='tuition');
     if(ptItems.length){
       const currentCls = document.getElementById('s-class')?.value||'';
-      const isKelpie = currentCls==='Kelpie';
-      const filtered = ptItems.filter(([,v])=>{
-        if(isKelpie) return v.condition?.cls==='Kelpie';
-        return !v.condition?.cls; // Kelpie 전용 제외
-      });
+      // 현재 반 전용 교습비가 있으면 그것만, 없으면 일반(반 미지정) 교습비
+      const clsItems = ptItems.filter(([,v])=>v.condition?.cls===currentCls);
+      let list;
+      if(clsItems.length){
+        list = clsItems; // 이 반 전용 단가 (Summer Camp, Kelpie 등)
+      } else {
+        list = ptItems.filter(([,v])=>!v.condition?.cls); // 반 미지정 일반 단가
+      }
       const seen = new Set();
-      freqSel.innerHTML = filtered.map(([k,v])=>{
-        const freq = v.condition?.freq || (v.condition?.cls==='Kelpie' ? '3' : '3');
-        if(seen.has(freq)) return '';
-        seen.add(freq);
-        return `<option value="${freq}">${v.label} — ${won(v.amount)}</option>`;
+      const opts = list.map(([k,v])=>{
+        // 교습비 금액은 findFeeItem이 cls 우선 매칭하므로 정확. value는 freq 숫자로 유지
+        // (셔틀·차감 등 freq 기반 로직 호환). 반 전용이라 freq가 없으면 기본 '3'.
+        const val = v.condition?.freq || '3';
+        const dispKey = (v.condition?.cls||'') + '|' + val;
+        if(seen.has(dispKey)) return '';
+        seen.add(dispKey);
+        return `<option value="${val}">${v.label} — ${won(v.amount)}</option>`;
       }).filter(Boolean).join('');
+      freqSel.innerHTML = opts || '<option value="3">주 3회</option><option value="5">주 5회</option>';
     } else {
       freqSel.innerHTML = '<option value="3">주 3회</option><option value="5">주 5회</option>';
     }
@@ -6295,7 +6673,7 @@ function toggleNavGroup(id){
 function expandNavGroupForPage(p){
   const map = {
     dashboard:'nav-main',
-    billing:'nav-billing', students:'nav-billing', spotcare:'nav-billing', refund:'nav-billing', special:'nav-billing',
+    billing:'nav-billing', students:'nav-billing', spotcare:'nav-billing', refund:'nav-billing', camp:'nav-billing', special:'nav-billing',
     monthly:'nav-report', consult:'nav-report',
     master:'nav-settings', textbook:'nav-settings', sms:'nav-settings',
     'ag-home':'nav-guide',
