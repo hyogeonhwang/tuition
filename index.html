@@ -4856,8 +4856,10 @@ function applyDeduct() {
 function applyTuitionOverride(){
   const amtEl  = document.getElementById('tuition-override-amount');
   const memoEl = document.getElementById('tuition-override-memo');
-  const amt = parseInt(amtEl?.value);
-  if(!amt){ toast('수기 금액을 입력하세요.','warn'); return; }
+  const raw = (amtEl?.value ?? '').trim();
+  if(raw===''){ toast('수기 금액을 입력하세요. (0원도 입력 가능)','warn'); return; }
+  const amt = parseInt(raw);
+  if(isNaN(amt) || amt<0){ toast('올바른 금액을 입력하세요.','warn'); return; }
   const memo = memoEl?.value.trim()||'';
   const sid = deductTargetId;
   if(!billingOverrides[sid]) billingOverrides[sid]={};
