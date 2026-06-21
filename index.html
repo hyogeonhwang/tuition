@@ -2126,7 +2126,7 @@ function renderDashboard(viewMonth){
 
   // stat 카드
   document.getElementById('stat-grid').innerHTML=`
-    <div class="stat-card"><div class="stat-label">${m}월 전체 재원</div><div class="stat-value" style="color:var(--accent)">${active.length}<span style="font-size:13px;color:var(--text3);margin-left:4px;">명</span></div></div>
+    <div class="stat-card"><div class="stat-label">${m}월 전체 재원 <span style="font-size:10px;color:var(--text3);font-weight:400;">· ${isCurrentMonth?'오늘 기준':'말일 기준'}</span></div><div class="stat-value" style="color:var(--accent)">${active.length}<span style="font-size:13px;color:var(--text3);margin-left:4px;">명</span></div></div>
     <div class="stat-card"><div class="stat-label">알티오라</div><div class="stat-value" style="color:var(--altiora)">${byB('altiora').length}<span style="font-size:13px;color:var(--text3);margin-left:4px;">명</span></div></div>
     <div class="stat-card"><div class="stat-label">팬그램</div><div class="stat-value" style="color:var(--pangram)">${byB('pangram').length}<span style="font-size:13px;color:var(--text3);margin-left:4px;">명</span></div></div>
     <div class="stat-card"><div class="stat-label">페타무스</div><div class="stat-value" style="color:var(--petamus)">${byB('petamus').length}<span style="font-size:13px;color:var(--text3);margin-left:4px;">명</span></div></div>`;
@@ -3430,8 +3430,11 @@ function generateBilling(silent=false){
     <div class="billing-total-item"><div class="billing-total-label">팬그램</div><div class="billing-total-value" style="color:var(--accent)">${won(tot(currentBilling.filter(x=>x.s.brand==='pangram')))}</div></div>
     <div class="billing-total-item"><div class="billing-total-label">페타무스</div><div class="billing-total-value" style="color:var(--green)">${won(tot(currentBilling.filter(x=>x.s.brand==='petamus')))}</div></div>`;
   document.getElementById('billing-result-card').style.display='block';
-  document.getElementById('billing-result-title').textContent=`${year}년 ${month}월 청구 내역`;
-  document.getElementById('billing-result-sub').textContent=`활성 ${currentBilling.length}명`;
+  (function(){
+    let sy=year, sm=month+1; if(sm>12){sm=1;sy+=1;}
+    document.getElementById('billing-result-title').textContent=`${year}년 ${month}월 청구 내역 (${sm}월분)`;
+    document.getElementById('billing-result-sub').textContent=`${sm}월 재원 ${currentBilling.length}명`;
+  })();
   document.getElementById('btn-export').style.display='flex';
   // 마감 전이면 마감 버튼 표시
   const ymCheck = String(year)+String(month).padStart(2,'0');
