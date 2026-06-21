@@ -1770,6 +1770,29 @@ function isQM(m){return[2,5,8,11].includes(m);}
 function isSM(m){return[2,8].includes(m);}
 function qNum(m){return{2:1,5:2,8:3,11:4}[m]||0;}
 
+// ── 청구 대상 판정 (선납 구조: N월 청구 = (N+1)월분) ──────────────
+// N월 청구서는 다음 달(N+1월) 원비를 미리 받는 것이므로,
+// '(N+1)월에 하루라도 재원하는 학생'이 청구 대상.
+// 포함 조건: 입학일 ≤ (N+1)월 말일 그리고 (퇴원일 없음 또는 퇴원일 ≥ (N+1)월 1일)
+// 퇴원일/입학일 = 'YYYY-MM-DD' 일자(leaveMonth 필드명이나 실제값은 일자), 빈 입학일은 통과(기존 재원).
+// billYear/billMonth = 청구서를 만드는 달(예: 6월 청구면 6)
+function isBillTarget(s, billYear, billMonth){
+  // 청구월 다음 달(수업월) 계산 — 12월이면 다음 해 1월
+  let svcYear = billYear, svcMonth = billMonth + 1;
+  if(svcMonth > 12){ svcMonth = 1; svcYear += 1; }
+  const svcStart = new Date(svcYear, svcMonth-1, 1);       // 수업월 1일
+  const svcEnd   = new Date(svcYear, svcMonth, 0);         // 수업월 말일
+  if(s.joinDate){
+    const j = new Date(s.joinDate);
+    if(!isNaN(j) && j > svcEnd) return false;   // 수업월 안에 아직 입학 안 함
+  }
+  if(s.leaveMonth){
+    const l = new Date(s.leaveMonth);
+    if(!isNaN(l) && l < svcStart) return false; // 수업월 시작 전에 이미 퇴원(마지막 다닌 날이 그 전)
+  }
+  return true;
+}
+
 // ══════════════════════════════════════════════
 // TUITION CALC
 // ══════════════════════════════════════════════
@@ -2069,15 +2092,30 @@ function renderDashboard(viewMonth){
   if(viewMonth !== undefined) dashViewMonth = viewMonth;
   if(dashViewMonth === undefined) dashViewMonth = now.getMonth()+1;
   const m = dashViewMonth;
-  // 월별 재원 원생 필터
-  // 해당 월의 1일 기준으로 퇴원일 비교
+  // ── 재원 인원 판정 (날짜 기반) ──────────────────────────
+  // active 플래그를 보지 않고 입학일(joinDate)·퇴원일(leaveMonth, 실제값은 'YYYY-MM-DD' 일자)로 판정.
+  // 판정 기준일(refDate):
+  //   - 조회월이 '현재 진행 중인 달'이면 → 오늘 날짜 기준 (지금 실제 재원 인원)
+  //   - 지난달/다음달이면 → 그 달 말일 기준
+  // 포함 조건: 입학일 ≤ refDate 그리고 (퇴원일 없음 또는 퇴원일 ≥ refDate)
+  // 퇴원일 = '마지막 다닌 날'. 입학일 빈 값은 '기존 재원'으로 간주(통과).
   const viewYear = CY.year || new Date().getFullYear();
-  const viewMonthStart = new Date(viewYear, m-1, 1); // 해당 월 1일
+  const today = kstNow();
+  const isCurrentMonth = (today.getFullYear() === viewYear) && (today.getMonth()+1 === m);
+  // 기준일: 이번 달이면 오늘, 아니면 그 달 말일
+  const refDate = isCurrentMonth
+    ? new Date(viewYear, m-1, today.getDate())
+    : new Date(viewYear, m, 0); // 그 달 말일
   const active = S().filter(s=>{
-    if(!s.active) return false;
-    if(!s.leaveMonth) return true;
-    const leaveDate = new Date(s.leaveMonth);
-    return leaveDate >= viewMonthStart; // 퇴원일이 해당 월 이후면 포함
+    if(s.joinDate){
+      const j = new Date(s.joinDate);
+      if(!isNaN(j) && j > refDate) return false; // 아직 입학 전
+    }
+    if(s.leaveMonth){
+      const l = new Date(s.leaveMonth);
+      if(!isNaN(l) && refDate > l) return false; // 퇴원일 지남 (마지막 다닌 날 이후)
+    }
+    return true;
   });
   const byB = k => active.filter(s=>s.brand===k);
 
@@ -3367,7 +3405,7 @@ function generateBilling(silent=false){
     <span class="tag tag-blue">월 교습비</span>
     ${isQ?`<span class="tag tag-yellow">분기(${qNum(month)}분기) — 셔틀·교재비</span>`:''}
     ${isS?'<span class="tag tag-red">반기 — 알티오라 재료비</span>':''}`;
-    currentBilling=S().filter(s=>s.active).map(s=>({s,a:calcBilling(s,month)}));
+    currentBilling=S().filter(s=>isBillTarget(s,year,month)).map(s=>({s,a:calcBilling(s,month)}));
   } else {
     // 마감 전 — 항상 현재 설정으로 새로 계산
     renderOnetimeRows();
@@ -3375,7 +3413,7 @@ function generateBilling(silent=false){
     <span class="tag tag-blue">월 교습비</span>
     ${isQ?`<span class="tag tag-yellow">분기(${qNum(month)}분기) — 셔틀·교재비</span>`:''}
     ${isS?'<span class="tag tag-red">반기 — 알티오라 재료비</span>':''}`;
-    currentBilling=S().filter(s=>s.active).map(s=>({s,a:calcBilling(s,month)}));
+    currentBilling=S().filter(s=>isBillTarget(s,year,month)).map(s=>({s,a:calcBilling(s,month)}));
     // 임시 결과 저장 (마감 전)
     if(!CY.billings) CY.billings={};
     if(!CY.billings[ym]) CY.billings[ym]={};
