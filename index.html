@@ -6051,9 +6051,14 @@ function renderMonthlyReport(){
     .sort((a,b)=> a.leaveMonth > b.leaveMonth ? 1 : -1);
 
   // 재원 현황: 해당 월에 재원 중인 원생 (입학일 이전 제외, 퇴원일 이전 월 제외)
+  // 재원 현황: 대시보드와 동일 기준 — 이번 달이면 '오늘', 다른 달이면 '그 달 말일' 기준 현재 재원
+  // (아래 신규/퇴원 명단은 '그 달에 들고난 누적'으로 별개. 상단 카드와 수가 다를 수 있음 — 의도된 차이)
+  const _today = kstNow();
+  const _isCurMonth = (_today.getFullYear()===year) && (_today.getMonth()+1===month);
+  const _refDate = _isCurMonth ? new Date(year, month-1, _today.getDate()) : new Date(year, month, 0);
   const activeAll = all.filter(s=>{
-    if(s.joinDate && s.joinDate > mEndStr) return false;   // 아직 입학 안 함
-    if(s.leaveMonth && s.leaveMonth < mStartStr) return false; // 이미 퇴원
+    if(s.joinDate){ const j=new Date(s.joinDate); if(!isNaN(j) && j>_refDate) return false; }
+    if(s.leaveMonth){ const l=new Date(s.leaveMonth); if(!isNaN(l) && _refDate>l) return false; }
     return true;
   });
   const byBrand = {altiora:0,pangram:0,petamus:0};
