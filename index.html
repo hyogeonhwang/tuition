@@ -904,7 +904,7 @@ tr.inactive td{opacity:.38;}
             </select>
           </div>
           <div class="form-group"><label>연락처</label>
-            <input type="text" id="c-phone" placeholder="010-0000-0000">
+            <input type="text" id="c-phone" data-phone="1" placeholder="010-0000-0000">
           </div>
         </div>
         <div class="form-row">
@@ -1143,10 +1143,10 @@ tr.inactive td{opacity:.38;}
       <div class="form-group"><label>수납유형</label><select id="tb-type"><option value="전체">전체</option><option value="주3회">주3회</option><option value="주5회">주5회</option></select></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>1분기(3~5월)</label><input type="number" id="tb-q1" min="0"></div>
-      <div class="form-group"><label>2분기(6~8월)</label><input type="number" id="tb-q2" min="0"></div>
-      <div class="form-group"><label>3분기(9~11월)</label><input type="number" id="tb-q3" min="0"></div>
-      <div class="form-group"><label>4분기(12~2월)</label><input type="number" id="tb-q4" min="0"></div>
+      <div class="form-group"><label>1분기(3~5월)</label><input type="text" inputmode="numeric" id="tb-q1" data-comma="1"></div>
+      <div class="form-group"><label>2분기(6~8월)</label><input type="text" inputmode="numeric" id="tb-q2" data-comma="1"></div>
+      <div class="form-group"><label>3분기(9~11월)</label><input type="text" inputmode="numeric" id="tb-q3" data-comma="1"></div>
+      <div class="form-group"><label>4분기(12~2월)</label><input type="text" inputmode="numeric" id="tb-q4" data-comma="1"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-textbook')">취소</button>
@@ -1170,7 +1170,7 @@ tr.inactive td{opacity:.38;}
       </div>
       <div class="form-group">
         <label>하루 차감 단가</label>
-        <input type="number" id="deduct-rate" min="0" step="1000" placeholder="0" oninput="calcDeductPreview()">
+        <input type="text" inputmode="numeric" id="deduct-rate" data-comma="1" placeholder="0" oninput="calcDeductPreview()">
       </div>
       <div class="form-group">
         <label>차감 금액 (자동)</label>
@@ -1199,7 +1199,7 @@ tr.inactive td{opacity:.38;}
       <div class="form-row">
         <div class="form-group">
           <label>수기 금액</label>
-          <input type="number" id="tuition-override-amount" placeholder="직접 입력" step="1000">
+          <input type="text" inputmode="numeric" id="tuition-override-amount" data-comma="1" placeholder="직접 입력">
         </div>
         <div class="form-group full">
           <label>수정 사유 메모</label>
@@ -1279,8 +1279,8 @@ tr.inactive td{opacity:.38;}
         <div class="form-group"><label>출판사/시리즈</label><input type="text" id="tbm-publisher" placeholder="예: 이퓨처"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>구매가 (원)</label><input type="number" id="tbm-cost" value="0" min="0" step="500"></div>
-        <div class="form-group"><label>판매가 (원)</label><input type="number" id="tbm-sell" value="0" min="0" step="500" ></div>
+        <div class="form-group"><label>구매가 (원)</label><input type="text" inputmode="numeric" id="tbm-cost" data-comma="1" value="0"></div>
+        <div class="form-group"><label>판매가 (원)</label><input type="text" inputmode="numeric" id="tbm-sell" data-comma="1" value="0"></div>
       </div>
       <div class="form-row">
         <div class="form-group full"><label>메모</label><input type="text" id="tbm-memo" placeholder=""></div>
@@ -2611,10 +2611,10 @@ function openRefundModal(type, editId){
         <div><label>차감 일수</label><br>
           <input type="number" id="rf-days" value="${editing?.days||''}" min="0" oninput="calcRefundDeduct()" style="font-size:13px;padding:7px;border-radius:8px;width:80px;"></div>
         <div><label>하루 단가</label><br>
-          <input type="number" id="rf-rate" value="${editing?.rate||''}" step="1000" oninput="calcRefundDeduct()" style="font-size:13px;padding:7px;border-radius:8px;width:110px;"></div>
+          <input type="text" inputmode="numeric" id="rf-rate" data-comma="1" value="${editing?formatComma(editing.rate):''}" oninput="calcRefundDeduct()" style="font-size:13px;padding:7px;border-radius:8px;width:110px;"></div>
         <div style="flex:1;min-width:160px;"><label>차감 금액 <span style="font-size:10px;color:var(--text3);font-weight:400;">(직접 수정 가능)</span></label><br>
           <div style="display:flex;gap:6px;align-items:center;">
-            <input type="number" id="rf-amount" value="${editing?.amount||''}" step="1000" placeholder="자동 계산"
+            <input type="text" inputmode="numeric" id="rf-amount" data-comma="1" value="${editing?formatComma(editing.amount):''}" placeholder="자동 계산"
               oninput="markRefundAmountManual()" style="font-size:13px;padding:7px;border-radius:8px;flex:1;min-width:0;font-weight:700;color:var(--accent2);">
             <button type="button" class="btn btn-secondary btn-sm" onclick="recalcRefundAmount()" title="일수×단가로 다시 계산" style="white-space:nowrap;">↻ 자동</button>
           </div></div>
@@ -2794,7 +2794,7 @@ function weekdayCount(start, end){
 function refundItemRow(it, i){
   return `<div class="rf-item-row" style="display:flex;gap:6px;align-items:center;margin-bottom:5px;">
     <input type="text" class="rf-item-label" value="${(it.label||'').replace(/"/g,'&quot;')}" placeholder="항목" style="font-size:12px;padding:5px;width:110px;">
-    <input type="number" class="rf-item-amount" value="${it.amount||0}" step="1000" oninput="updateRefundItemsTotal()" style="font-size:12px;padding:5px;width:100px;">
+    <input type="text" inputmode="numeric" class="rf-item-amount" data-comma="1" value="${formatComma(it.amount||0)}" oninput="updateRefundItemsTotal()" style="font-size:12px;padding:5px;width:100px;">
     <input type="text" class="rf-item-memo" value="${(it.memo||'').replace(/"/g,'&quot;')}" placeholder="차감 메모(선택)" style="font-size:12px;padding:5px;flex:1;">
     <span onclick="this.closest('.rf-item-row').remove();updateRefundItemsTotal()" style="cursor:pointer;color:var(--red);font-size:13px;" title="삭제">✕</span>
   </div>`;
@@ -2808,7 +2808,7 @@ function addRefundItemRow(){
 }
 function updateRefundItemsTotal(){
   let t=0;
-  document.querySelectorAll('#rf-items .rf-item-amount').forEach(el=>{ t+=parseInt(el.value)||0; });
+  document.querySelectorAll('#rf-items .rf-item-amount').forEach(el=>{ t+=unComma(el.value); });
   const el=document.getElementById('rf-items-total');
   if(el) el.textContent=won(t);
 }
@@ -2828,14 +2828,14 @@ function saveRefund(type, editId){
     rec.start = document.getElementById('rf-start').value;
     rec.end = document.getElementById('rf-end').value;
     rec.days = parseInt(document.getElementById('rf-days')?.value)||0;
-    rec.rate = parseInt(document.getElementById('rf-rate')?.value)||0;
-    rec.amount = parseInt(document.getElementById('rf-amount').value)||0;
+    rec.rate = unComma(document.getElementById('rf-rate')?.value);
+    rec.amount = unComma(document.getElementById('rf-amount').value);
   } else {
     rec.account = document.getElementById('rf-account').value.trim();
     const items=[];
     document.querySelectorAll('#rf-items .rf-item-row').forEach(row=>{
       const label=row.querySelector('.rf-item-label').value.trim();
-      const amount=parseInt(row.querySelector('.rf-item-amount').value)||0;
+      const amount=unComma(row.querySelector('.rf-item-amount').value);
       const memo=row.querySelector('.rf-item-memo').value.trim();
       if(label && amount) items.push({label,amount,memo});
     });
@@ -3001,6 +3001,56 @@ function checkRefundDeductReflection(ymKey){
 
 function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── 전화번호 하이픈 자동 포맷 ──────────────────────────
+// 숫자만 추출 후 자릿수에 따라 하이픈 삽입. 휴대폰(010 등) 및 일반전화(02/지역번호) 대응.
+function formatPhone(v){
+  const d=(v||'').replace(/[^0-9]/g,'').slice(0,11);
+  if(!d) return '';
+  // 02 (서울) — 2자리 국번
+  if(d.startsWith('02')){
+    if(d.length<=2) return d;
+    if(d.length<=5) return d.slice(0,2)+'-'+d.slice(2);
+    if(d.length<=9) return d.slice(0,2)+'-'+d.slice(2,5)+'-'+d.slice(5);
+    return d.slice(0,2)+'-'+d.slice(2,6)+'-'+d.slice(6,10);
+  }
+  // 그 외 (010, 031, 070 등) — 3자리 국번
+  if(d.length<=3) return d;
+  if(d.length<=7) return d.slice(0,3)+'-'+d.slice(3);
+  if(d.length<=10) return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6); // 지역번호 등
+  return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7,11);               // 휴대폰 11자리
+}
+// input에 실시간 하이픈 적용 (커서는 끝으로)
+function attachPhoneFormat(el){
+  if(!el) return;
+  el.value = formatPhone(el.value);
+  el.addEventListener('input', function(){ this.value = formatPhone(this.value); });
+}
+
+// ── 금액 천단위 콤마 ──────────────────────────
+function formatComma(v){
+  const d=(''+(v??'')).replace(/[^0-9]/g,'');
+  if(!d) return '';
+  return parseInt(d,10).toLocaleString('ko-KR');
+}
+function unComma(v){ return parseInt((''+(v||'')).replace(/[^0-9]/g,''),10)||0; }
+function attachCommaFormat(el){
+  if(!el) return;
+  el.value = formatComma(el.value);
+  el.addEventListener('input', function(){
+    this.value = formatComma(this.value);
+  });
+}
+// data-comma="1" 입력칸 전역 자동 적용 (동적 모달 포함 — 이벤트 위임)
+document.addEventListener('input', function(e){
+  const t=e.target;
+  if(t && t.matches && t.matches('input[data-comma="1"]')){
+    t.value = formatComma(t.value);
+  }
+  if(t && t.matches && t.matches('input[data-phone="1"]')){
+    t.value = formatPhone(t.value);
+  }
+});
+
 // ══════════════ 캠프 관리 (정규와 완전 분리) ══════════════
 let _currentCampId = null;
 
@@ -3044,7 +3094,7 @@ function openCampModal(editId){
             <input id="camp-end" type="text" value="${editing?.end||''}" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
         </div>
         <div class="form-row"><label>1인 기본 금액</label>
-          <input id="camp-fee" type="number" step="10000" value="${editing?.fee||''}" placeholder="예: 1200000" style="width:180px;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+          <input id="camp-fee" type="text" inputmode="numeric" data-comma="1" value="${editing?formatComma(editing.fee):''}" placeholder="예: 1,200,000" style="width:180px;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
         <div class="form-row"><label>메모 (선택)</label>
           <input id="camp-memo" type="text" value="${editing?escapeHtml(editing.memo||''):''}" placeholder="예: 페타무스 / 2주 과정" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
       </div>
@@ -3064,7 +3114,7 @@ function saveCamp(editId){
     name,
     start: document.getElementById('camp-start').value.trim(),
     end: document.getElementById('camp-end').value.trim(),
-    fee: parseInt(document.getElementById('camp-fee').value)||0,
+    fee: unComma(document.getElementById('camp-fee').value),
     memo: document.getElementById('camp-memo').value.trim(),
     createdAt: editId ? undefined : new Date().toISOString(),
     members: []
@@ -3168,7 +3218,7 @@ function renderCampMembers(){
         ? `<span onclick="toggleCampPaid('${m.id}')" style="cursor:pointer;color:#16A34A;font-weight:600;" title="클릭하여 미납으로">✔ 완납</span>`
         : `<span onclick="toggleCampPaid('${m.id}')" style="cursor:pointer;color:#D97706;font-weight:600;" title="클릭하여 완납으로">⏳ 미납</span>`;
       return `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:8px;font-weight:600;">${escapeHtml(m.name)}</td>
+        <td style="padding:8px;font-weight:600;">${escapeHtml(m.name)}${m.grade?`<span style="font-weight:400;font-size:11px;color:var(--accent2);margin-left:6px;">${escapeHtml(m.grade)}</span>`:''}${m.memo?`<div style="font-weight:400;font-size:11px;color:var(--text3);margin-top:2px;">${escapeHtml(m.memo)}</div>`:''}</td>
         <td style="padding:8px;">${typeBadge}</td>
         <td style="padding:8px;">${escapeHtml(m.phone||'')}</td>
         <td style="padding:8px;text-align:right;font-weight:700;" class="mono">${won(m.fee||0)}</td>
@@ -3202,10 +3252,15 @@ function openCampMemberModal(editId){
             <div id="cm-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:60;background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;margin-top:2px;max-height:200px;overflow-y:auto;box-shadow:0 4px 14px rgba(0,0,0,.12);"></div>
           </div></div>
         <div class="form-row"><label>연락처</label>
-          <input id="cm-phone" type="text" value="${editing?escapeHtml(editing.phone||''):''}" placeholder="010-0000-0000" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+          <input id="cm-phone" type="text" inputmode="numeric" data-phone="1" value="${editing?escapeHtml(editing.phone||''):''}" placeholder="010-0000-0000" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;"></div>
+        <div class="form-row"><label>학년</label>
+          <input id="cm-grade" type="text" list="cm-grade-list" value="${editing?escapeHtml(editing.grade||''):''}" placeholder="예: 초1 (직접 입력)" style="width:180px;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;">
+          <datalist id="cm-grade-list">${campGradeOptions()}</datalist></div>
         <div class="form-row"><label>금액</label>
-          <input id="cm-fee" type="number" step="10000" value="${editing?editing.fee:(camp.fee||'')}" placeholder="금액" style="width:180px;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;">
+          <input id="cm-fee" type="text" inputmode="numeric" value="${editing?formatComma(editing.fee):formatComma(camp.fee||'')}" placeholder="금액" style="width:180px;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;">
           <div class="text-xs text-muted" style="margin-top:3px;">기본 금액 자동 입력 · 형제할인 등은 직접 수정</div></div>
+        <div class="form-row"><label>메모</label>
+          <textarea id="cm-memo" rows="2" placeholder="메모 (선택)" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;font-size:13px;resize:vertical;">${editing?escapeHtml(editing.memo||''):''}</textarea></div>
         <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
           <input id="cm-paid" type="checkbox" ${editing?.paid?'checked':''} style="width:16px;height:16px;"> 납부 완료</label></div>
       </div>
@@ -3215,6 +3270,8 @@ function openCampMemberModal(editId){
       </div>
     </div>`;
   document.body.appendChild(modal);
+  attachPhoneFormat(document.getElementById('cm-phone'));
+  attachCommaFormat(document.getElementById('cm-fee'));
   if(!window._campMemOutsideBound){
     window._campMemOutsideBound=true;
     document.addEventListener('click',function(e){
@@ -3243,6 +3300,11 @@ function selectCampStudent(sid){
   document.getElementById('cm-suggest').style.display='none';
 }
 
+function campGradeOptions(){
+  const set=new Set();
+  (getCamps()||[]).forEach(cp=>(cp.members||[]).forEach(m=>{ if(m.grade) set.add(m.grade); }));
+  return Array.from(set).sort().map(g=>`<option value="${escapeHtml(g)}">`).join('');
+}
 function saveCampMember(editId){
   const camp=getCamps().find(c=>c.id===_currentCampId);
   if(!camp) return;
@@ -3253,7 +3315,9 @@ function saveCampMember(editId){
     name,
     linkedSid: document.getElementById('cm-linked').value||null,
     phone: document.getElementById('cm-phone').value.trim(),
-    fee: parseInt(document.getElementById('cm-fee').value)||0,
+    fee: unComma(document.getElementById('cm-fee').value),
+    memo: document.getElementById('cm-memo').value.trim(),
+    grade: (document.getElementById('cm-grade')?.value||'').trim(),
     paid: document.getElementById('cm-paid').checked
   };
   if(!camp.members) camp.members=[];
@@ -4896,13 +4960,13 @@ function openMasterEdit(path,idx,showCls=false){
   document.getElementById('modal-master-body').innerHTML=`
     <div class="form-row"><div class="form-group full"><label>항목명</label><input type="text" id="me-label" value="${item.label}"></div></div>
     <div class="form-row">
-      <div class="form-group"><label>금액 (원)</label><input type="number" id="me-amount" value="${item.amount}" min="0" step="1000"></div>
+      <div class="form-group"><label>금액 (원)</label><input type="text" inputmode="numeric" id="me-amount" data-comma="1" value="${formatComma(item.amount)}"></div>
       ${clsOptions}
       <div class="form-group"><label>비고</label><input type="text" id="me-note" value="${item.note||''}"></div>
     </div>`;
   document.getElementById('modal-master-save').onclick=()=>{
     arr[idx].label=document.getElementById('me-label').value;
-    arr[idx].amount=parseInt(document.getElementById('me-amount').value)||0;
+    arr[idx].amount=unComma(document.getElementById('me-amount').value);
     arr[idx].note=document.getElementById('me-note').value;
     if(showCls) arr[idx].cls=document.getElementById('me-cls')?.value||'';
     saveYearData();closeModal('modal-master');renderMasterContent(currentMasterTab);toast('단가가 수정되었습니다.');
@@ -4920,14 +4984,14 @@ function openMasterAdd(path,showCls=false){
   document.getElementById('modal-master-body').innerHTML=`
     <div class="form-row"><div class="form-group full"><label>항목명 *</label><input type="text" id="me-label" placeholder="예: 새 교재비 항목"></div></div>
     <div class="form-row">
-      <div class="form-group"><label>금액 (원)</label><input type="number" id="me-amount" value="0" min="0" step="1000"></div>
+      <div class="form-group"><label>금액 (원)</label><input type="text" inputmode="numeric" id="me-amount" data-comma="1" value="0"></div>
       ${clsOptions}
       <div class="form-group"><label>비고</label><input type="text" id="me-note" placeholder=""></div>
     </div>`;
   document.getElementById('modal-master-save').onclick=()=>{
     const label=document.getElementById('me-label').value.trim();
     if(!label){alert('항목명을 입력하세요.');return;}
-    getMasterArr(path).push({label,key:'custom_'+Date.now(),amount:parseInt(document.getElementById('me-amount').value)||0,note:document.getElementById('me-note').value});
+    getMasterArr(path).push({label,key:'custom_'+Date.now(),amount:unComma(document.getElementById('me-amount').value),note:document.getElementById('me-note').value});
     saveYearData();closeModal('modal-master');renderMasterContent(currentMasterTab);toast('항목이 추가되었습니다.');
   };
   document.getElementById('modal-master').classList.add('open');
@@ -4953,7 +5017,7 @@ function openTextbookModal(idx=-1){
   document.getElementById('modal-textbook').classList.add('open');
 }
 function saveTextbook(){
-  const tb={brand:document.getElementById('tb-brand').value,cls:document.getElementById('tb-class').value,type:document.getElementById('tb-type').value,q1:parseInt(document.getElementById('tb-q1').value)||0,q2:parseInt(document.getElementById('tb-q2').value)||0,q3:parseInt(document.getElementById('tb-q3').value)||0,q4:parseInt(document.getElementById('tb-q4').value)||0};
+  const tb={brand:document.getElementById('tb-brand').value,cls:document.getElementById('tb-class').value,type:document.getElementById('tb-type').value,q1:unComma(document.getElementById('tb-q1').value),q2:unComma(document.getElementById('tb-q2').value),q3:unComma(document.getElementById('tb-q3').value),q4:unComma(document.getElementById('tb-q4').value)};
   if(editTBIdx>=0)CY.textbooks[editTBIdx]=tb;else CY.textbooks.push(tb);
   saveYearData();closeModal('modal-textbook');renderTextbookTable();toast(editTBIdx>=0?'교재비가 수정되었습니다.':'교재비가 추가되었습니다.');
 }
@@ -5020,8 +5084,8 @@ function openTbMasterModal(idx=-1){
       name,
       brand: document.getElementById('tbm-brand').value,
       publisher: document.getElementById('tbm-publisher').value,
-      costPrice: parseInt(document.getElementById('tbm-cost').value)||0,
-      sellPrice: parseInt(document.getElementById('tbm-sell').value)||0,
+      costPrice: unComma(document.getElementById('tbm-cost').value),
+      sellPrice: unComma(document.getElementById('tbm-sell').value),
       memo: document.getElementById('tbm-memo').value,
     };
     if(!CY.tbMaster) CY.tbMaster=[];
@@ -5268,7 +5332,7 @@ function openDeductModal(sid) {
 
 function calcDeductPreview() {
   const days = parseInt(document.getElementById('deduct-days').value) || 0;
-  const rate = parseInt(document.getElementById('deduct-rate').value) || 0;
+  const rate = unComma(document.getElementById('deduct-rate').value);
   const amount = days * rate;
   document.getElementById('deduct-amount').value = amount ? won(amount) : '';
   const preview = document.getElementById('deduct-preview');
@@ -5282,7 +5346,7 @@ function calcDeductPreview() {
 
 function applyDeduct() {
   const days = parseInt(document.getElementById('deduct-days').value) || 0;
-  const rate = parseInt(document.getElementById('deduct-rate').value) || 0;
+  const rate = unComma(document.getElementById('deduct-rate').value);
   if (!days || !rate) { alert('차감 일수와 단가를 입력하세요.'); return; }
   const amount = days * rate;
   const reason = document.getElementById('deduct-reason').value;
@@ -5298,7 +5362,7 @@ function applyDeduct() {
 function applyTuitionOverride(){
   const amtEl  = document.getElementById('tuition-override-amount');
   const memoEl = document.getElementById('tuition-override-memo');
-  const raw = (amtEl?.value ?? '').trim();
+  const raw = (amtEl?.value ?? '').replace(/,/g,'').trim();
   if(raw===''){ toast('수기 금액을 입력하세요. (0원도 입력 가능)','warn'); return; }
   const amt = parseInt(raw);
   if(isNaN(amt) || amt<0){ toast('올바른 금액을 입력하세요.','warn'); return; }
@@ -5766,8 +5830,8 @@ function renderOnetimeRows() {
           'AR비용','기타'
         ].filter((v,i,a)=>a.indexOf(v)===i).map(i=>`<option ${row.item===i?'selected':''}>${i}</option>`).join('')}
       </select>
-      <input type="number" value="${row.amount}" min="0" step="10000"
-        onchange="updateOnetimeRow('${row.id}','amount',parseInt(this.value)||0)"
+      <input type="text" inputmode="numeric" data-comma="1" value="${formatComma(row.amount)}"
+        onchange="updateOnetimeRow('${row.id}','amount',unComma(this.value))"
         style="font-size:12px;padding:5px 8px;max-width:120px;" placeholder="금액">
       <button class="btn btn-danger btn-sm" onclick="removeOnetimeRow('${row.id}')">✕</button>
     </div>`).join('');
@@ -5920,12 +5984,12 @@ function editFeeItem(key){
     </div></div>
     <div class="form-row"><div class="form-group">
       <label>금액 (원)</label>
-      <input type="number" id="fi-amount" value="${item.amount}" min="0" step="1000">
+      <input type="text" inputmode="numeric" id="fi-amount" data-comma="1" value="${formatComma(item.amount)}">
     </div></div>`;
   document.getElementById('modal-master-save').onclick=()=>{
     if(!M().feeItems) M().feeItems={};
     M().feeItems[key].label = document.getElementById('fi-label').value || item.label;
-    M().feeItems[key].amount = parseInt(document.getElementById('fi-amount').value)||0;
+    M().feeItems[key].amount = unComma(document.getElementById('fi-amount').value);
     saveYearData();
     closeModal('modal-master');
     renderMasterContent(currentMasterTab);
@@ -5969,13 +6033,13 @@ function addFeeItem(brand, type){
     </div></div>
     <div class="form-row"><div class="form-group">
       <label>금액 (원)</label>
-      <input type="number" id="fi-amount" value="0" min="0" step="1000">
+      <input type="text" inputmode="numeric" id="fi-amount" data-comma="1" value="0">
     </div></div>
     ${condHTML}${htimeNote}`;
   document.getElementById('modal-master-save').onclick=()=>{
     const label = document.getElementById('fi-label').value.trim();
     if(!label){ toast('항목명을 입력하세요.','error'); return; }
-    const amount = parseInt(document.getElementById('fi-amount').value)||0;
+    const amount = unComma(document.getElementById('fi-amount').value);
     const key = brand+'_'+type+'_'+Date.now();
     const condition = {};
     // 교습비/차감단가: condition.htime = key (드롭다운 value와 동일)
@@ -6387,34 +6451,35 @@ function renderConsultSummary(rows, lbl, isAll){
   const contactOrder = ['전화','오픈채팅','네이버톡톡','walk-in','문자','기타'];
   const sourceOrder  = ['블로그','인스타그램','지인·단톡','카페·검색','버스·지나가다','셔틀버스','네이버검색','미확인','기타'];
 
-  const listHTML = (order, counts) => order
-    .filter(k=> counts[k])
-    .map(k=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;">
-      <span style="color:var(--text2);">${k}</span>
-      <span style="font-weight:700;color:var(--accent2);">${counts[k]}건</span>
-    </div>`).join('');
+  const listHTML = (order, counts) => {
+    const items = order.filter(k=> counts[k]);
+    if(!items.length) return '';
+    return `<div style="display:flex;flex-wrap:wrap;gap:5px 8px;">` + items.map(k=>
+      `<span style="font-size:12px;color:var(--text2);white-space:nowrap;">${k} <b style="color:var(--accent2);">${counts[k]}</b></span>`
+    ).join('<span style="color:var(--border);">·</span>') + `</div>`;
+  };
 
   const brandHTML = Object.entries(brandCounts)
     .map(([k,v])=>`<span class="tag tag-blue" style="font-size:12px;">${k} ${v}건</span>`).join(' ');
 
   document.getElementById('consult-summary').innerHTML = `
-    <div class="card" style="border-left:4px solid var(--accent2);">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">
+    <div class="card" style="border-left:4px solid var(--accent2);padding:10px 14px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">
         📊 ${lbl} ${isAll?'보고':'주간 보고'} <span style="color:var(--accent2);margin-left:8px;">총 ${total}건</span>
         ${meetCount?`<span style="color:var(--green);font-size:12px;margin-left:8px;">대면상담 ${meetCount}건${isAll?'':' 예정'}</span>`:''}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;">
         <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px;">1. Contact 경로</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:4px;">1. Contact 경로</div>
           ${listHTML(contactOrder, contactCounts)||'<div class="text-muted text-sm">없음</div>'}
         </div>
         <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px;">2. 알게된 경로</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:4px;">2. 알게된 경로</div>
           ${listHTML(sourceOrder, sourceCounts)||'<div class="text-muted text-sm">없음</div>'}
         </div>
       </div>
-      ${brandHTML?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-        <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px;">3. 구분</div>
+      ${brandHTML?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:4px;">3. 구분</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${brandHTML}</div>
       </div>`:''}
     </div>`;
@@ -6635,7 +6700,7 @@ function openBillingOverride(sid, field, origAmt, label){
     <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">
       원래 금액: ${won(origAmt)}
     </div>
-    <input id="ov-amount" type="number" value="${curAmt}"
+    <input id="ov-amount" type="text" inputmode="numeric" data-comma="1" value="${formatComma(curAmt)}"
       style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;margin-bottom:8px;"
       onkeydown="if(event.key==='Enter') saveBillingOverride('${sid}','${field}',${origAmt})">
     <input id="ov-memo" type="text" value="${curMemo}" placeholder="수정 사유 메모..."
@@ -6675,7 +6740,7 @@ function saveBillingOverride(sid, field, origAmt){
   const amtEl  = document.getElementById('ov-amount');
   const memoEl = document.getElementById('ov-memo');
   if(!amtEl) return;
-  const newAmt = parseInt(amtEl.value)||0;
+  const newAmt = unComma(amtEl.value);
   const memo   = memoEl?.value.trim()||'';
   if(!billingOverrides[sid]) billingOverrides[sid] = {};
   billingOverrides[sid][field] = { amount: newAmt, memo, origAmt };
@@ -7021,7 +7086,7 @@ function rowAddCustom(sid) {
         <div class="form-row"><label>항목명</label>
           <input id="custom-ot-item" type="text" placeholder="예: AR비용" style="width:100%;box-sizing:border-box;padding:8px;font-size:13px;border-radius:8px;"></div>
         <div class="form-row"><label>금액</label>
-          <input id="custom-ot-amount" type="number" min="0" step="10000" placeholder="금액" style="width:100%;box-sizing:border-box;padding:8px;font-size:13px;border-radius:8px;"></div>
+          <input id="custom-ot-amount" type="text" inputmode="numeric" data-comma="1" placeholder="금액" style="width:100%;box-sizing:border-box;padding:8px;font-size:13px;border-radius:8px;"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="document.getElementById('custom-ot-modal').remove()">취소</button>
@@ -7039,7 +7104,7 @@ function rowAddCustomConfirm(sid) {
   const itemEl = document.getElementById('custom-ot-item');
   const amtEl = document.getElementById('custom-ot-amount');
   const item = (itemEl?.value||'').trim() || '기타';
-  const amount = parseInt(amtEl?.value) || 0;
+  const amount = unComma(amtEl?.value);
   addOnetimeRow(sid, item, amount);
   const m = document.getElementById('custom-ot-modal');
   if(m) m.remove();
