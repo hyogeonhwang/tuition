@@ -6505,12 +6505,15 @@ function renderConsultSummary(rows, lbl, isAll){
   const brandHTML = Object.entries(brandCounts)
     .map(([k,v])=>`<span class="tag tag-blue" style="font-size:12px;">${k} ${v}건</span>`).join(' ');
 
+  const _sumOpen = localStorage.getItem('consult_summary_open')==='1';
   document.getElementById('consult-summary').innerHTML = `
     <div class="card" style="border-left:4px solid var(--accent2);padding:10px 14px;">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:700;display:flex;align-items:center;cursor:pointer;${_sumOpen?'margin-bottom:8px;':''}" onclick="toggleConsultSummary()">
         📊 ${lbl} ${isAll?'보고':'주간 보고'} <span style="color:var(--accent2);margin-left:8px;">총 ${total}건</span>
         ${meetCount?`<span style="color:var(--green);font-size:12px;margin-left:8px;">대면상담 ${meetCount}건${isAll?'':' 예정'}</span>`:''}
+        <span id="consult-summary-arrow" style="margin-left:auto;font-size:11px;color:var(--text3);">${_sumOpen?'▲':'▼'}</span>
       </div>
+      <div id="consult-summary-body" style="display:${_sumOpen?'block':'none'};">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;">
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:4px;">1. Contact 경로</div>
@@ -6525,7 +6528,22 @@ function renderConsultSummary(rows, lbl, isAll){
         <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:4px;">3. 구분</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">${brandHTML}</div>
       </div>`:''}
+      </div>
     </div>`;
+}
+
+// 주간보고 써머리 접기/펼치기 (상태 기억)
+function toggleConsultSummary(){
+  const body = document.getElementById('consult-summary-body');
+  const arrow = document.getElementById('consult-summary-arrow');
+  if(!body) return;
+  const open = body.style.display==='none';
+  body.style.display = open ? 'block' : 'none';
+  if(arrow) arrow.textContent = open ? '▲' : '▼';
+  // 제목 아래 여백도 토글
+  const titleRow = body.previousElementSibling;
+  if(titleRow) titleRow.style.marginBottom = open ? '8px' : '0';
+  localStorage.setItem('consult_summary_open', open ? '1' : '0');
 }
 
 function openConsultModal(id){
