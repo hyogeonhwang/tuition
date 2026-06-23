@@ -805,6 +805,8 @@ tr.inactive td{opacity:.38;}
               style="width:auto;padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);min-width:110px;max-width:150px;flex-shrink:0;">
               <option value="">전체</option>
             </select>
+            <button id="consult-filter-flag" onclick="toggleConsultFlagFilter()"
+              style="font-size:13px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;color:var(--text2);white-space:nowrap;flex-shrink:0;">🚩 깃발만 보기</button>
           </div>
           <button id="consult-filter-clear" onclick="clearConsultFilters()"
             style="display:none;font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);cursor:pointer;color:var(--text2);">✕ 필터 해제</button>
@@ -919,6 +921,11 @@ tr.inactive td{opacity:.38;}
           <div class="form-group"><label>테스트일정</label>
             <input type="text" id="c-testdate" placeholder="YYYYMMDD" maxlength="10" oninput="autoFormatDate(this)">
           </div>
+        </div>
+        <div class="form-row">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#C0392B;">
+            <input type="checkbox" id="c-flag" style="width:16px;height:16px;accent-color:#C0392B;"> 🚩 신규반 연락 대상
+          </label>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="document.getElementById('modal-consult').style.display='none'">취소</button>
@@ -6393,16 +6400,51 @@ function renderConsultFilter(){
   const fBrand = document.getElementById('consult-filter-brand')?.value||'';
   const fRecv  = document.getElementById('consult-filter-receiver')?.value||'';
 
+  // 깃발 필터 버튼 상태 반영
+  const flagBtn = document.getElementById('consult-filter-flag');
+  if(flagBtn){
+    if(consultFlagFilter){
+      flagBtn.style.background='#FBEAE8'; flagBtn.style.borderColor='#C0392B'; flagBtn.style.color='#C0392B'; flagBtn.style.fontWeight='600';
+    }else{
+      flagBtn.style.background='var(--surface)'; flagBtn.style.borderColor='var(--border)'; flagBtn.style.color='var(--text2)'; flagBtn.style.fontWeight='400';
+    }
+  }
+
   // 필터 활성 시 '필터 해제' 버튼 표시
   const clr = document.getElementById('consult-filter-clear');
-  if(clr) clr.style.display = (q||fBrand||fRecv) ? 'inline-flex' : 'none';
+  if(clr) clr.style.display = (q||fBrand||fRecv||consultFlagFilter) ? 'inline-flex' : 'none';
 
   let filtered = consultRows;
   if(q)      filtered = filtered.filter(r=>(r.name||'').includes(q)||(r.phone||'').includes(q));
   if(fBrand) filtered = filtered.filter(r=>(r.brand||'')===fBrand);
   if(fRecv)  filtered = filtered.filter(r=>(r.receiver||'').trim()===fRecv);
+  if(consultFlagFilter) filtered = filtered.filter(r=>!!r.flag);
 
   renderConsultTable(filtered);
+}
+
+// 깃발만 보기 토글 — 켜면 전체 누적 전환, 끄면 이전 모드로 복귀
+let consultFlagFilter = false;
+let _consultModeBeforeFlag = null; // 깃발 켜기 직전 모드 기억
+function toggleConsultFlagFilter(){
+  consultFlagFilter = !consultFlagFilter;
+  if(consultFlagFilter){
+    // 켜기: 현재 모드 기억 후, 주간이면 전체 누적으로 전환
+    _consultModeBeforeFlag = consultViewMode;
+    if(consultViewMode!=='all'){
+      setConsultMode('all'); // 전환+재로드 → 완료 후 renderConsultFilter가 깃발 적용
+    }else{
+      renderConsultFilter();
+    }
+  }else{
+    // 끄기: 깃발 켜기 전 모드로 복귀
+    if(_consultModeBeforeFlag && _consultModeBeforeFlag!==consultViewMode){
+      setConsultMode(_consultModeBeforeFlag); // 원래 모드로 (재로드 후 깃발 해제 상태로 렌더)
+    }else{
+      renderConsultFilter();
+    }
+    _consultModeBeforeFlag = null;
+  }
 }
 
 function clearConsultFilters(){
@@ -6410,6 +6452,7 @@ function clearConsultFilters(){
   const b = document.getElementById('consult-filter-brand'); if(b) b.value='';
   const r = document.getElementById('consult-filter-receiver'); if(r) r.value='';
   const sc = document.getElementById('consult-search-clear'); if(sc) sc.style.display='none';
+  consultFlagFilter = false;
   renderConsultFilter();
 }
 
@@ -6428,7 +6471,7 @@ function renderConsultTable(rows){
       <td style="font-size:12px;">${r.receiver||''}</td>
       <td><span class="brand-badge ${r.brand==='알티오라'?'altiora-badge':r.brand==='팬그램'?'pangram-badge':r.brand==='페타무스'?'petamus-badge':''}"
         style="font-size:10px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);">${r.brand||''}</span></td>
-      <td style="font-weight:600;">${r.name||''}</td>
+      <td style="font-weight:600;">${r.flag?'<span style="color:#C0392B;">🚩</span> ':''}${r.name||''}</td>
       <td style="font-size:12px;text-align:center;">${r.age||''}</td>
       <td style="font-size:12px;text-align:center;">${r.gender||''}</td>
       <td style="font-size:12px;">${r.phone||''}</td>
@@ -6507,6 +6550,7 @@ function openConsultModal(id){
       document.getElementById('c-content').value = r.content||'';
       document.getElementById('c-meetdate').value = r.meetdate||'';
       document.getElementById('c-testdate').value = r.testdate||'';
+      document.getElementById('c-flag').checked = !!r.flag;
     });
   } else {
     title.textContent = '상담 입력';
@@ -6526,6 +6570,7 @@ function openConsultModal(id){
     document.getElementById('c-content').value = '';
     document.getElementById('c-meetdate').value = '';
     document.getElementById('c-testdate').value = '';
+    document.getElementById('c-flag').checked = false;
   }
   const consultOverlay = document.getElementById('modal-consult');
   const consultModal = consultOverlay.querySelector('.modal');
@@ -6569,6 +6614,7 @@ function saveConsult(){
     content:  document.getElementById('c-content').value.trim(),
     meetdate: document.getElementById('c-meetdate').value,
     testdate: document.getElementById('c-testdate').value,
+    flag: document.getElementById('c-flag').checked,
     createdAt: _consultEditCreatedAt || Date.now(), // 최초 입력시각 (수정해도 보존)
     ts: Date.now() // 최종 수정시각
   };
