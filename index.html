@@ -549,14 +549,33 @@ tr.inactive td{opacity:.38;}
         <button class="btn btn-primary btn-sm" onclick="openRefundModal('deduct')">＋ 청구 차감</button>
         <button class="btn btn-primary btn-sm" onclick="openRefundModal('withdraw')">＋ 퇴원 환불</button>
         <div style="flex:1;"></div>
-        <button class="btn btn-secondary btn-sm" onclick="copyRefundRequest()">📋 이번 주 송금요청 복사</button>
+        <button class="btn btn-secondary btn-sm" onclick="copyRefundRequest()">📋 이 주 송금요청 복사</button>
+      </div>
+
+      <div class="card" style="padding:10px 14px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <button id="refund-mode-week" class="btn" onclick="setRefundMode('week')"
+              style="border:none;border-radius:0;padding:7px 14px;font-size:13px;font-weight:600;background:var(--accent2);color:#fff;cursor:pointer;">주간 조회</button>
+            <button id="refund-mode-all" class="btn" onclick="setRefundMode('all')"
+              style="border:none;border-radius:0;padding:7px 14px;font-size:13px;font-weight:600;background:var(--surface);color:var(--text2);cursor:pointer;">전체 누적</button>
+          </div>
+          <div id="refund-week-nav" style="display:inline-flex;align-items:center;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="moveRefundWeek(-1)">◀ 이전 주</button>
+            <span id="refund-week-label" style="font-size:13px;font-weight:600;min-width:150px;text-align:center;"></span>
+            <button class="btn btn-secondary btn-sm" onclick="moveRefundWeek(1)">다음 주 ▶</button>
+            <button class="btn btn-secondary btn-sm" onclick="refundThisWeek()">이번 주</button>
+          </div>
+        </div>
       </div>
 
       <div class="card" style="padding:12px 14px;margin-bottom:14px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <div style="position:relative;flex:1;min-width:200px;max-width:280px;">
             <input type="text" id="refund-search" placeholder="🔍 학생 이름 검색..." oninput="renderRefundList()"
-              style="font-size:13px;padding:7px 12px;width:100%;box-sizing:border-box;border-radius:8px;">
+              style="font-size:13px;padding:7px 30px 7px 12px;width:100%;box-sizing:border-box;border-radius:8px;">
+            <span id="refund-search-clear" onclick="document.getElementById('refund-search').value='';renderRefundList();"
+              style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;line-height:1;">✕</span>
           </div>
           <select id="refund-filter-type" onchange="renderRefundList()" style="font-size:13px;padding:7px 10px;border-radius:8px;width:auto;">
             <option value="">전체 유형</option>
@@ -2550,7 +2569,7 @@ function initRefundPage(){
     sf.innerHTML = '<option value="">전체 담당자</option>' +
       sorted.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
   }
-  renderRefundList();
+  setRefundMode(refundViewMode); // 저장된 모드로 UI 동기화 + 렌더 (내부에서 renderRefundList 호출)
 }
 
 function clearRefundFilters(){
@@ -2667,6 +2686,7 @@ function openRefundModal(type, editId){
           <input type="text" id="rf-reason" value="${(editing?.reason||'').replace(/"/g,'&quot;')}" placeholder="예: 일본 학교로 전학 / 여행(제주) / 병결" style="font-size:13px;padding:7px;width:100%;box-sizing:border-box;border-radius:8px;"></div>
         <div class="form-row" style="display:flex;gap:14px;flex-wrap:wrap;">
           <div><label>처리 월</label><br><select id="rf-procYM" style="font-size:13px;padding:7px;border-radius:8px;">${refundMonthOptions(procYM)}</select></div>
+          ${t==='withdraw'?`<div><label>환불 예정일</label><br><input type="date" id="rf-payDate" value="${editing?.payDate||thisFriday()}" style="font-size:13px;padding:7px;border-radius:8px;"></div>`:''}
           <div style="flex:1;min-width:120px;"><label>담당자</label><br><input type="text" id="rf-staff" value="${(editing?.staff||'').replace(/"/g,'&quot;')}" placeholder="담당자 이름" style="font-size:13px;padding:7px;width:100%;box-sizing:border-box;border-radius:8px;"></div>
         </div>
       </div>
@@ -2839,6 +2859,7 @@ function saveRefund(type, editId){
     rec.amount = unComma(document.getElementById('rf-amount').value);
   } else {
     rec.account = document.getElementById('rf-account').value.trim();
+    rec.payDate = document.getElementById('rf-payDate')?.value || thisFriday();
     const items=[];
     document.querySelectorAll('#rf-items .rf-item-row').forEach(row=>{
       const label=row.querySelector('.rf-item-label').value.trim();
@@ -2886,15 +2907,62 @@ function toggleRefundStatus(id){
   renderRefundList();
 }
 
+// ── 환불 주간/누적 조회 ──────────────────────────────
+let refundViewMode = localStorage.getItem('refund_view_mode') || 'week';
+let refundMonday = null; // 현재 조회 주의 월요일
+function setRefundMode(mode){
+  refundViewMode = mode;
+  localStorage.setItem('refund_view_mode', mode);
+  const wBtn=document.getElementById('refund-mode-week');
+  const aBtn=document.getElementById('refund-mode-all');
+  const nav=document.getElementById('refund-week-nav');
+  if(mode==='week'){
+    if(wBtn){wBtn.style.background='var(--accent2)';wBtn.style.color='#fff';}
+    if(aBtn){aBtn.style.background='var(--surface)';aBtn.style.color='var(--text2)';}
+    if(nav) nav.style.display='inline-flex';
+    if(!refundMonday) refundMonday = getMonday(kstNow());
+  }else{
+    if(aBtn){aBtn.style.background='var(--accent2)';aBtn.style.color='#fff';}
+    if(wBtn){wBtn.style.background='var(--surface)';wBtn.style.color='var(--text2)';}
+    if(nav) nav.style.display='none';
+  }
+  renderRefundList();
+}
+function moveRefundWeek(delta){
+  if(!refundMonday) refundMonday = getMonday(kstNow());
+  const d=new Date(refundMonday); d.setDate(d.getDate()+delta*7);
+  refundMonday=d; renderRefundList();
+}
+function refundThisWeek(){ refundMonday=getMonday(kstNow()); renderRefundList(); }
+
 function renderRefundList(){
   const el = document.getElementById('refund-list');
   if(!el) return;
   const q = (document.getElementById('refund-search')?.value||'').trim().toLowerCase();
+  const _rsc = document.getElementById('refund-search-clear');
+  if(_rsc) _rsc.style.display = q ? 'inline' : 'none';
   const fType = document.getElementById('refund-filter-type')?.value||'';
   const fStaff = document.getElementById('refund-filter-staff')?.value||'';
   const fProcYM = document.getElementById('refund-filter-procYM')?.value||'';
 
   let list = (CY.refunds||[]).slice().sort((a,b)=> (b.createdAt||'').localeCompare(a.createdAt||''));
+
+  // 주간 조회: 퇴원 환불=예정일(payDate), 청구 차감=생성일(createdAt) 기준
+  const weekLabel = document.getElementById('refund-week-label');
+  if(refundViewMode==='week'){
+    if(!refundMonday) refundMonday = getMonday(kstNow());
+    const mon=new Date(refundMonday); const fri=new Date(mon); fri.setDate(mon.getDate()+4);
+    const monStr=fmtDate(mon), friStr=fmtDate(fri);
+    if(weekLabel){ const f=d=>`${d.getMonth()+1}/${d.getDate()}`; weekLabel.textContent = `${f(mon)}(월) ~ ${f(fri)}(금)`; }
+    list = list.filter(r=>{
+      let d='';
+      if(r.type==='withdraw') d = r.payDate || (r.createdAt||'').slice(0,10);
+      else d = (r.createdAt||'').slice(0,10);
+      if(!d) return true; // 날짜 없으면 누락 방지 위해 포함
+      return d >= monStr && d <= friStr;
+    });
+  }
+
   list = list.filter(r=>{
     const s = S().find(x=>x.id===r.sid);
     const nm = (s?.name||'')+(s?.ename||'');
@@ -2934,7 +3002,7 @@ function renderRefundList(){
       if(r.type==='withdraw'){
         statusCell = r.status==='done'
           ? `<span onclick="toggleRefundStatus('${r.id}')" style="cursor:pointer;color:#16A34A;font-weight:600;" title="클릭하여 대기로">✔ 완료</span>`
-          : `<span onclick="toggleRefundStatus('${r.id}')" style="cursor:pointer;color:#D97706;font-weight:600;" title="클릭하여 완료로">⏳ 대기</span>`;
+          : `<span onclick="toggleRefundStatus('${r.id}')" style="cursor:pointer;color:#D97706;font-weight:600;" title="클릭하여 완료로">⏳ 대기</span>${r.payDate?`<div style="font-size:10px;color:var(--text3);margin-top:1px;">${r.payDate.slice(5).replace('-','/')} 예정</div>`:''}`;
       } else if(r.type==='deduct'){
         const reflected = isDeductReflected(r);
         statusCell = reflected
@@ -2958,8 +3026,27 @@ function renderRefundList(){
 
 // 이번 주 송금요청 텍스트 복사 (퇴원환불 중 대기 건)
 function copyRefundRequest(){
-  const pending = (CY.refunds||[]).filter(r=>r.type==='withdraw' && r.status!=='done');
-  if(!pending.length){ toast('송금 대기 중인 퇴원 환불이 없습니다','info'); return; }
+  // 전체 누적 모드에서는 특정 주가 없으므로 복사하지 않고 안내
+  if(refundViewMode!=='week'){
+    toast('주간 조회로 전환한 뒤, 송금할 주를 선택하고 복사해주세요','info',3500);
+    return;
+  }
+  // 화면에 보이는 그 주(월~금) 기준
+  if(!refundMonday) refundMonday = getMonday(kstNow());
+  const mon=new Date(refundMonday); const fri=new Date(mon); fri.setDate(mon.getDate()+4);
+  const monStr=fmtDate(mon), friStr=fmtDate(fri);
+  const all = (CY.refunds||[]).filter(r=>r.type==='withdraw' && r.status!=='done');
+  // 이 주(월~금)에 예정된 미완료 건 (예정일 없는 기존 건은 생성일로 폴백, 그마저 없으면 누락방지 위해 포함)
+  const pending = all.filter(r=>{
+    const d = r.payDate || (r.createdAt||'').slice(0,10);
+    if(!d) return true;
+    return d >= monStr && d <= friStr;
+  });
+  const wkLabel = `${mon.getMonth()+1}/${mon.getDate()}~${fri.getMonth()+1}/${fri.getDate()}`;
+  if(!pending.length){
+    toast(`${wkLabel} 주에 송금 예정인 퇴원 환불이 없습니다`,'info');
+    return;
+  }
   let txt = `이사장님, 안녕하세요.\n퇴원 환불 ${pending.length}명 송금 요청드립니다.\n\n`;
   pending.forEach((r,i)=>{
     const s=S().find(x=>x.id===r.sid);
@@ -2973,7 +3060,7 @@ function copyRefundRequest(){
     txt += `\n`;
   });
   navigator.clipboard.writeText(txt.trim()).then(()=>{
-    toast(`송금요청 ${pending.length}건 복사됨 — 카톡에 붙여넣기`,'success',3000);
+    toast(`${wkLabel} 주 송금요청 ${pending.length}건 복사됨 — 카톡에 붙여넣기`,'success',3200);
   }).catch(()=>{
     // 클립보드 실패 시 프롬프트로 표시
     prompt('아래 내용을 복사하세요:', txt.trim());
@@ -3040,6 +3127,19 @@ function formatComma(v){
   return parseInt(d,10).toLocaleString('ko-KR');
 }
 function unComma(v){ return parseInt((''+(v||'')).replace(/[^0-9]/g,''),10)||0; }
+
+// 오늘이 속한 주의 금요일(YYYY-MM-DD) — 월요일 시작 주 기준. 오늘이 토·일이면 지난 금요일.
+function thisFriday(base){
+  const d = base ? new Date(base) : kstNow();
+  d.setHours(0,0,0,0);
+  const day = d.getDay(); // 0=일 1=월 ... 5=금 6=토
+  let diff = 5 - day;      // 금요일까지의 차이
+  if(day===6) diff = -1;   // 토요일 → 어제(금)
+  if(day===0) diff = -2;   // 일요일 → 그제(금)
+  d.setDate(d.getDate()+diff);
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
 function attachCommaFormat(el){
   if(!el) return;
   el.value = formatComma(el.value);
