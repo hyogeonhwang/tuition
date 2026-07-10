@@ -3394,9 +3394,9 @@ function filterCampStudents(){
   const q=(sch.value||'').trim().toLowerCase();
   document.getElementById('cm-linked').value='';
   if(!q){ box.style.display='none'; return; }
-  const list=S().filter(s=>s.brand==='petamus' && ((s.name||'').toLowerCase().includes(q)||(s.ename||'').toLowerCase().includes(q))).slice(0,20);
+  const list=S().filter(s=>((s.name||'').toLowerCase().includes(q)||(s.ename||'').toLowerCase().includes(q))).slice(0,20);
   if(!list.length){ box.style.display='none'; return; }
-  box.innerHTML=list.map(s=>`<div onclick="selectCampStudent('${s.id}')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><strong>${s.name}</strong>${s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''} <span style="color:var(--text3);font-size:11px;">· ${s.cls}</span></div>`).join('');
+  box.innerHTML=list.map(s=>`<div onclick="selectCampStudent('${s.id}')" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><strong>${s.name}</strong>${s.ename?` <span style="color:var(--text3);font-size:11px;">${s.ename}</span>`:''} <span style="color:var(--text3);font-size:11px;">· ${BRANDS[s.brand]?.name||''} ${s.cls||''}</span></div>`).join('');
   box.style.display='block';
 }
 function selectCampStudent(sid){
