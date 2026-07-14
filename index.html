@@ -4214,7 +4214,8 @@ function renderRoster(){
     classes.forEach(c=>{
       const s=byCls[c][i];
       if(s){
-        html+=`<td onclick="openStudentModal('${s.id}')" style="padding:5px 10px;border:1px solid var(--border);white-space:nowrap;cursor:pointer;"
+        const idx = S().findIndex(x=>x.id===s.id); // openStudentModal은 배열 인덱스를 받음
+        html+=`<td onclick="openStudentModal(${idx})" style="padding:5px 10px;border:1px solid var(--border);white-space:nowrap;cursor:pointer;"
           onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
           ${escapeHtml(s.name||'')}${s.ename?` <span style="color:var(--text3);font-size:11px;">${escapeHtml(s.ename)}</span>`:''}</td>`;
       }else{
