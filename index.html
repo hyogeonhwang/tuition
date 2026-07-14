@@ -4133,13 +4133,22 @@ function rosterRefDate(){
   if(rosterDate){ const d=new Date(rosterDate); d.setHours(0,0,0,0); if(!isNaN(d)) return d; }
   const t=kstNow(); t.setHours(0,0,0,0); return t;
 }
+// 기준일을 'YYYY-MM-DD' 문자열로 (시간대 영향 없음)
+function rosterRefStr(){
+  return rosterDate || fmtDate(kstNow());
+}
 
-function isEnrolledOn(s, ref){
-  if(s.joinDate){ const j=new Date(s.joinDate); if(!isNaN(j) && j>ref) return false; } // 아직 입학 전
-  if(s.leaveMonth){ const l=new Date(s.leaveMonth); if(!isNaN(l) && ref>l) return false; } // 퇴원일 지남
+// 날짜 문자열끼리 직접 비교 — new Date()로 파싱하면 UTC/KST 9시간 차로 하루가 밀리므로 문자열 비교 사용
+// joinDate/leaveMonth는 'YYYY-MM-DD' 형식. 사전순 비교 = 날짜순 비교.
+function isEnrolledOnStr(s, refStr){
+  const j=(s.joinDate||'').slice(0,10);
+  const l=(s.leaveMonth||'').slice(0,10);
+  if(j && j > refStr) return false;   // 아직 입학 전
+  if(l && l < refStr) return false;   // 퇴원일 지남 (퇴원일 당일까지는 재원)
   return true;
 }
-function isEnrolledToday(s){ return isEnrolledOn(s, rosterRefDate()); }
+function isEnrolledOn(s, ref){ return isEnrolledOnStr(s, fmtDate(ref)); }
+function isEnrolledToday(s){ return isEnrolledOnStr(s, rosterRefStr()); }
 
 function setRosterDate(v){
   rosterDate = v || null;
