@@ -477,6 +477,12 @@ tr.inactive td{opacity:.38;}
           <button onclick="setRosterBrand('pangram')" id="rb-pangram" style="border:none;border-left:1px solid var(--border);padding:7px 14px;font-size:13px;background:var(--surface);color:var(--text2);cursor:pointer;">팬그램</button>
           <button onclick="setRosterBrand('petamus')" id="rb-petamus" style="border:none;border-left:1px solid var(--border);padding:7px 14px;font-size:13px;background:var(--surface);color:var(--text2);cursor:pointer;">페타무스</button>
         </span>
+        <span id="roster-date-wrap" style="display:none;align-items:center;gap:6px;">
+          <label style="font-size:12px;color:var(--text3);">기준일</label>
+          <input type="date" id="roster-date" onchange="setRosterDate(this.value)"
+            style="font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;width:auto;">
+          <button class="btn btn-secondary btn-sm" onclick="rosterToday()">오늘</button>
+        </span>
         <span id="roster-summary" style="display:none;font-size:12px;color:var(--text3);margin-left:auto;"></span>
       </div>
 
@@ -4117,15 +4123,33 @@ function updateStudentClassFilter(){
   (bf?[bf]:Object.keys(CLASSES)).forEach(b=>CLASSES[b].forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}));
 }
 // ── 반별 명단 뷰 ──────────────────────────────────
-// 재원 판정: 대시보드와 동일한 '오늘 기준' 날짜 판정 (active 플래그 아님)
+// 재원 판정: 기준일(rosterDate) 기준 날짜 판정 (active 플래그 아님, 대시보드와 동일 로직)
+// 입학일 빈 값 = 기존 재원으로 간주(통과)
 let studentView = 'list';           // 'list' | 'roster'
 let rosterBrand = 'altiora';
+let rosterDate = null;              // null이면 오늘
 
-function isEnrolledToday(s){
-  const today = kstNow(); today.setHours(0,0,0,0);
-  if(s.joinDate){ const j=new Date(s.joinDate); if(!isNaN(j) && j>today) return false; } // 아직 입학 전
-  if(s.leaveMonth){ const l=new Date(s.leaveMonth); if(!isNaN(l) && today>l) return false; } // 퇴원일 지남
+function rosterRefDate(){
+  if(rosterDate){ const d=new Date(rosterDate); d.setHours(0,0,0,0); if(!isNaN(d)) return d; }
+  const t=kstNow(); t.setHours(0,0,0,0); return t;
+}
+
+function isEnrolledOn(s, ref){
+  if(s.joinDate){ const j=new Date(s.joinDate); if(!isNaN(j) && j>ref) return false; } // 아직 입학 전
+  if(s.leaveMonth){ const l=new Date(s.leaveMonth); if(!isNaN(l) && ref>l) return false; } // 퇴원일 지남
   return true;
+}
+function isEnrolledToday(s){ return isEnrolledOn(s, rosterRefDate()); }
+
+function setRosterDate(v){
+  rosterDate = v || null;
+  renderRoster();
+}
+function rosterToday(){
+  rosterDate = null;
+  const el=document.getElementById('roster-date');
+  if(el) el.value = fmtDate(kstNow());
+  renderRoster();
 }
 
 function setStudentView(v){
@@ -4135,6 +4159,7 @@ function setStudentView(v){
   const lView=document.getElementById('student-list-view');
   const rView=document.getElementById('student-roster-view');
   const tabs=document.getElementById('roster-brand-tabs');
+  const dateWrap=document.getElementById('roster-date-wrap');
   const summ=document.getElementById('roster-summary');
   if(v==='roster'){
     if(rBtn){rBtn.style.background='var(--accent2)';rBtn.style.color='#fff';}
@@ -4142,7 +4167,10 @@ function setStudentView(v){
     if(lView) lView.style.display='none';
     if(rView) rView.style.display='';
     if(tabs) tabs.style.display='inline-flex';
+    if(dateWrap) dateWrap.style.display='inline-flex';
     if(summ) summ.style.display='';
+    const dEl=document.getElementById('roster-date');
+    if(dEl && !dEl.value) dEl.value = fmtDate(kstNow()); // 기본값 오늘
     renderRoster();
   }else{
     if(lBtn){lBtn.style.background='var(--accent2)';lBtn.style.color='#fff';}
@@ -4150,6 +4178,7 @@ function setStudentView(v){
     if(lView) lView.style.display='';
     if(rView) rView.style.display='none';
     if(tabs) tabs.style.display='none';
+    if(dateWrap) dateWrap.style.display='none';
     if(summ) summ.style.display='none';
   }
 }
@@ -4201,7 +4230,11 @@ function renderRoster(){
   const byCls={};
   classes.forEach(c=> byCls[c]=enrolled.filter(s=>s.cls===c).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko')));
   const maxRows = Math.max(...classes.map(c=>byCls[c].length));
-  if(summ) summ.textContent = `${BRANDS[rosterBrand]?.name||''} · ${classes.length}개 반 · ${enrolled.length}명 (오늘 기준)`;
+  if(summ){
+    const ref=rosterRefDate();
+    const isToday = fmtDate(ref)===fmtDate(kstNow());
+    summ.textContent = `${BRANDS[rosterBrand]?.name||''} · ${classes.length}개 반 · ${enrolled.length}명 (${isToday?'오늘':fmtDate(ref)} 기준)`;
+  }
 
   let html=`<table style="border-collapse:collapse;font-size:12px;">
     <thead><tr>
