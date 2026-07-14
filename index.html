@@ -465,6 +465,28 @@ tr.inactive td{opacity:.38;}
 
     <!-- STUDENTS -->
     <div class="page" id="page-students">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <button id="stu-view-list" onclick="setStudentView('list')"
+            style="border:none;padding:7px 16px;font-size:13px;font-weight:600;background:var(--accent2);color:#fff;cursor:pointer;">목록</button>
+          <button id="stu-view-roster" onclick="setStudentView('roster')"
+            style="border:none;padding:7px 16px;font-size:13px;font-weight:600;background:var(--surface);color:var(--text2);cursor:pointer;">반별 명단</button>
+        </div>
+        <span id="roster-brand-tabs" style="display:none;align-items:center;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+          <button onclick="setRosterBrand('altiora')" id="rb-altiora" style="border:none;padding:7px 14px;font-size:13px;background:var(--accent2);color:#fff;cursor:pointer;">알티오라</button>
+          <button onclick="setRosterBrand('pangram')" id="rb-pangram" style="border:none;border-left:1px solid var(--border);padding:7px 14px;font-size:13px;background:var(--surface);color:var(--text2);cursor:pointer;">팬그램</button>
+          <button onclick="setRosterBrand('petamus')" id="rb-petamus" style="border:none;border-left:1px solid var(--border);padding:7px 14px;font-size:13px;background:var(--surface);color:var(--text2);cursor:pointer;">페타무스</button>
+        </span>
+        <span id="roster-summary" style="display:none;font-size:12px;color:var(--text3);margin-left:auto;"></span>
+      </div>
+
+      <div id="student-roster-view" style="display:none;">
+        <div class="card" style="padding:12px;overflow-x:auto;">
+          <div id="roster-table"></div>
+        </div>
+      </div>
+
+      <div id="student-list-view">
       <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:13px;">
         <div style="position:relative;flex:1;min-width:180px;max-width:240px;">
           <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);">🔍</span>
@@ -502,6 +524,7 @@ tr.inactive td{opacity:.38;}
           </table>
         </div>
       </div>
+      </div><!-- /student-list-view -->
     </div>
 
     <!-- 일시돌봄 -->
@@ -4093,7 +4116,120 @@ function updateStudentClassFilter(){
   sel.innerHTML='<option value="">전체 반</option>';
   (bf?[bf]:Object.keys(CLASSES)).forEach(b=>CLASSES[b].forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}));
 }
+// ── 반별 명단 뷰 ──────────────────────────────────
+// 재원 판정: 대시보드와 동일한 '오늘 기준' 날짜 판정 (active 플래그 아님)
+let studentView = 'list';           // 'list' | 'roster'
+let rosterBrand = 'altiora';
+
+function isEnrolledToday(s){
+  const today = kstNow(); today.setHours(0,0,0,0);
+  if(s.joinDate){ const j=new Date(s.joinDate); if(!isNaN(j) && j>today) return false; } // 아직 입학 전
+  if(s.leaveMonth){ const l=new Date(s.leaveMonth); if(!isNaN(l) && today>l) return false; } // 퇴원일 지남
+  return true;
+}
+
+function setStudentView(v){
+  studentView = v;
+  const lBtn=document.getElementById('stu-view-list');
+  const rBtn=document.getElementById('stu-view-roster');
+  const lView=document.getElementById('student-list-view');
+  const rView=document.getElementById('student-roster-view');
+  const tabs=document.getElementById('roster-brand-tabs');
+  const summ=document.getElementById('roster-summary');
+  if(v==='roster'){
+    if(rBtn){rBtn.style.background='var(--accent2)';rBtn.style.color='#fff';}
+    if(lBtn){lBtn.style.background='var(--surface)';lBtn.style.color='var(--text2)';}
+    if(lView) lView.style.display='none';
+    if(rView) rView.style.display='';
+    if(tabs) tabs.style.display='inline-flex';
+    if(summ) summ.style.display='';
+    renderRoster();
+  }else{
+    if(lBtn){lBtn.style.background='var(--accent2)';lBtn.style.color='#fff';}
+    if(rBtn){rBtn.style.background='var(--surface)';rBtn.style.color='var(--text2)';}
+    if(lView) lView.style.display='';
+    if(rView) rView.style.display='none';
+    if(tabs) tabs.style.display='none';
+    if(summ) summ.style.display='none';
+  }
+}
+
+function setRosterBrand(b){
+  rosterBrand=b;
+  ['altiora','pangram','petamus'].forEach(k=>{
+    const el=document.getElementById('rb-'+k);
+    if(!el) return;
+    if(k===b){ el.style.background='var(--accent2)'; el.style.color='#fff'; }
+    else { el.style.background='var(--surface)'; el.style.color='var(--text2)'; }
+  });
+  renderRoster();
+}
+
+// 반 이름에서 연령대 추출 → 헤더 색상 (나이별 구분)
+function rosterHeadColor(cls){
+  const c=(cls||'');
+  if(/^4/.test(c))            return '#FFF0DB'; // 4세 - 주황
+  if(/^5/.test(c))            return '#FFFBDB'; // 5세 - 노랑
+  if(/^6/.test(c)||/PK6/.test(c)) return '#E6F4E2'; // 6세 - 초록
+  if(/^7/.test(c)||/PK7/.test(c)) return '#E3EBF8'; // 7세 - 파랑
+  if(/Tier/.test(c))          return '#F0E6F6'; // Tier - 보라
+  if(/Lv\.1|Phoenix/.test(c)) return '#FFF0DB';
+  if(/Lv\.2|Pegasus/.test(c)) return '#FFFBDB';
+  if(/Lv\.3|Griffin/.test(c)) return '#E6F4E2';
+  if(/Lv\.4|Unicorn/.test(c)) return '#E3EBF8';
+  return '#F0F2F5';
+}
+
+function renderRoster(){
+  const el=document.getElementById('roster-table');
+  const summ=document.getElementById('roster-summary');
+  if(!el) return;
+  // 오늘 기준 재원 학생만 (대시보드와 동일 기준)
+  const enrolled = S().filter(s=> s.brand===rosterBrand && isEnrolledToday(s));
+  // 반 목록 (반 목록 관리 순서 우선, 없으면 학생 데이터에서 추출)
+  const cfgClasses = (CLASSES && CLASSES[rosterBrand]) || [];
+  const dataClasses = [...new Set(enrolled.map(s=>s.cls).filter(Boolean))];
+  const classes = cfgClasses.length
+    ? cfgClasses.filter(c=> dataClasses.includes(c)).concat(dataClasses.filter(c=> !cfgClasses.includes(c)))
+    : dataClasses.sort((a,b)=>a.localeCompare(b,'ko'));
+  if(!classes.length){
+    el.innerHTML='<div class="text-sm text-muted" style="padding:12px 0;">해당 브랜드의 재원 원생이 없습니다.</div>';
+    if(summ) summ.textContent='';
+    return;
+  }
+  // 반별 학생 그룹핑 (이름순)
+  const byCls={};
+  classes.forEach(c=> byCls[c]=enrolled.filter(s=>s.cls===c).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ko')));
+  const maxRows = Math.max(...classes.map(c=>byCls[c].length));
+  if(summ) summ.textContent = `${BRANDS[rosterBrand]?.name||''} · ${classes.length}개 반 · ${enrolled.length}명 (오늘 기준)`;
+
+  let html=`<table style="border-collapse:collapse;font-size:12px;">
+    <thead><tr>
+      <th style="padding:6px 4px;border:1px solid var(--border);background:var(--surface2);color:var(--text3);font-size:11px;width:30px;"></th>
+      ${classes.map(c=>`<th style="padding:8px 10px;border:1px solid var(--border);background:${rosterHeadColor(c)};font-weight:700;white-space:nowrap;">
+        ${escapeHtml(c)}<div style="font-weight:400;font-size:10px;color:var(--text3);">${byCls[c].length}명</div></th>`).join('')}
+    </tr></thead><tbody>`;
+  for(let i=0;i<maxRows;i++){
+    html+=`<tr><td style="padding:5px 4px;border:1px solid var(--border);text-align:center;color:var(--text3);font-size:11px;background:var(--surface2);">${i+1}</td>`;
+    classes.forEach(c=>{
+      const s=byCls[c][i];
+      if(s){
+        html+=`<td onclick="openStudentModal('${s.id}')" style="padding:5px 10px;border:1px solid var(--border);white-space:nowrap;cursor:pointer;"
+          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+          ${escapeHtml(s.name||'')}${s.ename?` <span style="color:var(--text3);font-size:11px;">${escapeHtml(s.ename)}</span>`:''}</td>`;
+      }else{
+        html+=`<td style="padding:5px 10px;border:1px solid var(--border);background:var(--surface2);"></td>`;
+      }
+    });
+    html+=`</tr>`;
+  }
+  html+=`</tbody></table>`;
+  el.innerHTML=html;
+}
+
 function renderStudentTable(){
+  // 반별 명단 뷰가 열려 있으면 함께 갱신 (원생 데이터 변경 시 자동 반영)
+  if(studentView==='roster') renderRoster();
   const q=(document.getElementById('student-search')?.value||'').toLowerCase();
   const bf=document.getElementById('sf-brand')?.value||'';
   const cf=document.getElementById('sf-class')?.value||'';
