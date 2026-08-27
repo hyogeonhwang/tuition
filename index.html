@@ -4423,6 +4423,14 @@ function updateCareFields(){
   if(group) group.style.display = care && care!=='없음' ? '' : 'none';
 }
 function updateOnetoneFields(){} // 레거시 — 모달에서 1:1 yn/paytype 제거됨
+// 교습비 항목명(label)에서 '주N회'의 N을 freq로 추출. 없으면 condition.freq, 그것도 없으면 '3'.
+// 예: '주2회 교습비' → '2', '주5회 교습비' → '5', 'Kelpie 교습비' → condition.freq || '3'
+function freqFromItem(v){
+  const m = (v.label||'').match(/주\s*([0-9]+)\s*회/);
+  if(m) return m[1];
+  return v.condition?.freq || '3';
+}
+
 function updateBrandFields(){
   const b=document.getElementById('s-brand').value;
   document.getElementById('s-htime-group').style.display=b==='altiora'?'flex':'none';
@@ -4447,7 +4455,7 @@ function updateBrandFields(){
     const pgItems = Object.entries(fi).filter(([,v])=>v.brand==='pangram'&&v.type==='tuition');
     freqSel.innerHTML = pgItems.length
       ? pgItems.map(([,v])=>{
-          const freq = v.condition?.freq||'3';
+          const freq = freqFromItem(v);
           return `<option value="${freq}">${v.label} — ${won(v.amount)}</option>`;
         }).join('')
       : '<option value="2">주 2회</option><option value="3">주 3회</option><option value="3e">초등 주 3회</option>';
@@ -4468,7 +4476,7 @@ function updateBrandFields(){
       const opts = list.map(([k,v])=>{
         // 교습비 금액은 findFeeItem이 cls 우선 매칭하므로 정확. value는 freq 숫자로 유지
         // (셔틀·차감 등 freq 기반 로직 호환). 반 전용이라 freq가 없으면 기본 '3'.
-        const val = v.condition?.freq || '3';
+        const val = freqFromItem(v);
         const dispKey = (v.condition?.cls||'') + '|' + val;
         if(seen.has(dispKey)) return '';
         seen.add(dispKey);
