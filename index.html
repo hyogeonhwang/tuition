@@ -379,10 +379,10 @@ tr.inactive td{opacity:.38;}
       <div class="grid2" id="dash-notice-memo" style="margin-top:16px;">
         <div class="card">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <div class="card-title">📢 공지</div>
-            <div style="flex:1;"></div>
-            <input type="text" id="dash-notice-input" placeholder="공지 입력 후 Enter (예: 6/25 청구 마감)" onkeydown="if(event.key==='Enter')addDashNotice()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);flex:1;max-width:340px;">
-            <button class="btn btn-primary btn-sm" onclick="addDashNotice()">추가</button>
+            <div class="card-title" style="white-space:nowrap;flex-shrink:0;">📢 공지</div>
+            <input type="date" id="dash-notice-date" title="공지가 표시될 달 (기본: 오늘)" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);flex-shrink:0;width:140px;">
+            <input type="text" id="dash-notice-input" placeholder="공지 입력 후 Enter (예: 6/25 청구 마감)" onkeydown="if(event.key==='Enter')addDashNotice()" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);flex:1;min-width:0;">
+            <button class="btn btn-primary btn-sm" onclick="addDashNotice()" style="flex-shrink:0;">추가</button>
           </div>
           <div id="dash-notice-list"></div>
         </div>
@@ -1031,9 +1031,14 @@ tr.inactive td{opacity:.38;}
     <!-- SMS 템플릿 -->
     <div class="page" id="page-sms">
       <div class="info-box">💡 자주 쓰는 메시지 템플릿을 저장해두고 복사해서 사용하세요.</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" onclick="pushLocalSmsTemplates()" title="이 PC에 저장돼 있던 템플릿을 전체 공유(Firebase)로 올립니다">⤴ 이 PC 템플릿 전체 공유</button>
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="openSmsTemplateModal()">+ 템플릿 추가</button>
+      </div>
+      <div style="position:relative;margin-bottom:12px;max-width:360px;">
+        <input type="text" id="sms-search" placeholder="🔍 제목·내용 검색..." oninput="renderSmsTemplateList()"
+          style="font-size:13px;padding:8px 30px 8px 12px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;">
+        <span id="sms-search-clear" onclick="document.getElementById('sms-search').value='';renderSmsTemplateList();"
+          style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:14px;line-height:1;">✕</span>
       </div>
       <div id="sms-template-list"></div>
     </div>
@@ -2076,8 +2081,20 @@ function addDashNotice(){
   const inp=document.getElementById('dash-notice-input');
   const v=(inp?.value||'').trim();
   if(!v) return;
-  getDashNotices().unshift({ id:'n'+Date.now(), text:v, ts:Date.now() });
+  // 날짜칸에서 표시될 달을 결정. 비어 있으면 오늘 기준.
+  // 날짜를 지정하면 그 날짜의 달에 공지가 표시됨 (미래 공지 미리 등록 가능)
+  const dateEl=document.getElementById('dash-notice-date');
+  let ts;
+  const dv=(dateEl?.value||'').trim();
+  if(dv){
+    const parts=dv.split('-'); // YYYY-MM-DD
+    ts=new Date(+parts[0], +parts[1]-1, +parts[2], 12, 0, 0).getTime();
+  } else {
+    ts=Date.now();
+  }
+  getDashNotices().unshift({ id:'n'+Date.now(), text:v, ts });
   if(inp) inp.value='';
+  if(dateEl) dateEl.value=''; // 추가 후 날짜칸 초기화(다음 입력은 다시 오늘 기준)
   saveYearData();
   renderDashNotices();
 }
@@ -2089,8 +2106,18 @@ function deleteDashNotice(id){
 function renderDashNotices(){
   const el=document.getElementById('dash-notice-list');
   if(!el) return;
-  const list=getDashNotices();
-  if(!list.length){ el.innerHTML='<div class="text-sm text-muted" style="padding:6px 0;">등록된 공지가 없습니다.</div>'; return; }
+  // 날짜칸이 비어 있으면 오늘로 기본 세팅 (표시용 — 비워도 오늘 처리됨)
+  const dEl=document.getElementById('dash-notice-date');
+  if(dEl && !dEl.value){ try{ dEl.value = fmtDate(kstNow()); }catch(e){} }
+  // 조회월(dashViewMonth) 기준으로 그 달 작성 공지만 표시
+  const vy = CY.year || new Date().getFullYear();
+  const vm = dashViewMonth;
+  const list=getDashNotices().filter(n=>{
+    const d=new Date(n.ts);
+    if(isNaN(d)) return true; // 시각 없는 옛 공지는 항상 표시(누락 방지)
+    return d.getFullYear()===vy && (d.getMonth()+1)===vm;
+  });
+  if(!list.length){ el.innerHTML='<div class="text-sm text-muted" style="padding:6px 0;">이 달 공지가 없습니다.</div>'; return; }
   el.innerHTML=list.map(n=>{
     const d=new Date(n.ts);
     const dt=isNaN(d)?'':`${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
@@ -5773,11 +5800,23 @@ function pushLocalSmsTemplates(){
 function renderSmsTemplateList() {
   const el = document.getElementById('sms-template-list');
   if (!el) return;
+  const q = (document.getElementById('sms-search')?.value||'').trim().toLowerCase();
+  const clr = document.getElementById('sms-search-clear');
+  if(clr) clr.style.display = q ? 'inline' : 'none';
+
   if (!smsTemplates.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📱</div><div class="text-muted text-sm">저장된 템플릿이 없습니다.</div></div>`;
     return;
   }
-  el.innerHTML = smsTemplates.map((tpl, i) => `
+  // 원본 인덱스를 유지한 채 필터 (검색 후에도 복사/수정/삭제가 올바른 템플릿을 가리키도록)
+  const rows = smsTemplates
+    .map((tpl, i) => ({tpl, i}))
+    .filter(({tpl}) => !q || (tpl.title||'').toLowerCase().includes(q) || (tpl.body||'').toLowerCase().includes(q));
+  if (!rows.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="text-muted text-sm">"${escapeHtml(q)}" 검색 결과가 없습니다.</div></div>`;
+    return;
+  }
+  el.innerHTML = rows.map(({tpl, i}) => `
     <div class="card" style="margin-bottom:12px;">
       <div class="card-header" style="margin-bottom:10px;">
         <div class="card-title">${tpl.title}</div>
