@@ -1031,7 +1031,8 @@ tr.inactive td{opacity:.38;}
     <!-- SMS 템플릿 -->
     <div class="page" id="page-sms">
       <div class="info-box">💡 자주 쓰는 메시지 템플릿을 저장해두고 복사해서 사용하세요.</div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="pushLocalSmsTemplates()" title="이 PC에 저장돼 있던 템플릿을 전체 공유(Firebase)로 올립니다">⤴ 이 PC 템플릿 전체 공유</button>
         <button class="btn btn-primary" onclick="openSmsTemplateModal()">+ 템플릿 추가</button>
       </div>
       <div id="sms-template-list"></div>
@@ -2048,7 +2049,7 @@ function showPage(p){
   if(p==='special')renderSpecialList('all');
   if(p==='textbook')renderTextbookTable();
   if(p==='yearend')renderArchiveList();
-  if(p==='sms'){ initSmsPage(); renderSmsTemplateList(); }
+  if(p==='sms'){ initSmsPage(); }
   if(p==='classconfig') renderClassConfig();
   if(p==='monthly'){ initMonthlySelectors(); renderMonthlyReport(); }
   if(p === 'ag-home'){
@@ -5711,20 +5712,62 @@ function updateBillingTotals() {
 // ══════════════════════════════════════════════
 // SMS 템플릿 (단순 저장/복사)
 // ══════════════════════════════════════════════
-let smsTemplates;
-try { smsTemplates = JSON.parse(localStorage.getItem('sms_templates')) || []; } catch(e) { smsTemplates = []; }
-smsTemplates = smsTemplates.length ? smsTemplates : [
-  { id:'t1', title:'미납 1차 안내', body:'안녕하세요 😊\n원비 납부가 아직 확인되지 않아 안내드립니다.\n바쁘신 중에도 빠른 납부 부탁드립니다 🙏\n\n입금계좌: 국민 045537-04-004674 (주)와이제이투\n입금자명: 성별/나이/원아이름 (예: 여7홍길동)' },
-  { id:'t2', title:'미납 2차 독촉', body:'안녕하세요 😊\n원비 납부 관련하여 재안내 드립니다.\n확인 후 빠른 시일 내 납부 부탁드립니다 🙏\n문의사항은 031-778-6655로 연락 주세요.' },
+let smsTemplates = [];
+const SMS_DEFAULT = [
+  { id:'t1', title:'미납 1차 안내', body:'안녕하세요 \u{1F60A}\n원비 납부가 아직 확인되지 않아 안내드립니다.\n바쁘신 중에도 빠른 납부 부탁드립니다 \u{1F64F}\n\n입금계좌: 국민 045537-04-004674 (주)와이제이투\n입금자명: 성별/나이/원아이름 (예: 여7홍길동)' },
+  { id:'t2', title:'미납 2차 독촉', body:'안녕하세요 \u{1F60A}\n원비 납부 관련하여 재안내 드립니다.\n확인 후 빠른 시일 내 납부 부탁드립니다 \u{1F64F}\n문의사항은 031-778-6655로 연락 주세요.' },
 ];
 let editSmsTemplateIdx = -1;
+let _smsLoaded = false;
 
-function saveSmsTemplates() {
-  localStorage.setItem('sms_templates', JSON.stringify(smsTemplates));
+async function saveSmsTemplates() {
+  try {
+    await fbSave('sms_templates', smsTemplates);
+  } catch(e){
+    console.error('SMS 템플릿 저장 실패', e);
+    toast('템플릿 저장 실패 — 네트워크를 확인하세요','warn');
+  }
+}
+
+async function loadSmsTemplates() {
+  try {
+    const data = await fbGet('sms_templates');
+    if (data && Array.isArray(data) && data.length) {
+      smsTemplates = data;
+    } else {
+      let local = [];
+      try { local = JSON.parse(localStorage.getItem('sms_templates')) || []; } catch(e){}
+      smsTemplates = local.length ? local : SMS_DEFAULT.slice();
+      await saveSmsTemplates();
+    }
+  } catch(e){
+    console.error('SMS 템플릿 로드 실패', e);
+    try { smsTemplates = JSON.parse(localStorage.getItem('sms_templates')) || SMS_DEFAULT.slice(); }
+    catch(_) { smsTemplates = SMS_DEFAULT.slice(); }
+  }
+  _smsLoaded = true;
 }
 
 function initSmsPage() {
-  renderSmsTemplateList();
+  loadSmsTemplates().then(renderSmsTemplateList);
+}
+
+// 이 PC의 localStorage 템플릿을 Firebase에 강제로 올려 전체 공유
+// (자동 마이그레이션이 순서 문제로 안 됐을 때 확실히 복구하는 수단)
+function pushLocalSmsTemplates(){
+  let local = [];
+  try { local = JSON.parse(localStorage.getItem('sms_templates')) || []; } catch(e){}
+  if(!local.length){
+    // 로컬에 없으면 현재 화면(메모리) 목록이라도 사용
+    local = smsTemplates.slice();
+  }
+  if(!local.length){ toast('이 PC에 공유할 템플릿이 없습니다','warn'); return; }
+  showConfirm(`이 PC의 템플릿 ${local.length}개를 전체 공유합니다.\n(다른 사람 화면도 이 목록으로 통일됩니다)`, async ()=>{
+    smsTemplates = local;
+    await saveSmsTemplates();
+    renderSmsTemplateList();
+    toast(`템플릿 ${local.length}개를 전체 공유했습니다`,'success');
+  });
 }
 
 function renderSmsTemplateList() {
