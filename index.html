@@ -399,7 +399,7 @@ tr.inactive td{opacity:.38;}
       <div class="billing-bar">
         <label style="font-size:13px;color:var(--text2);white-space:nowrap;font-weight:600;">청구 생성 월</label>
         <div style="display:flex;gap:4px;align-items:center;">
-          <select id="billing-year" style="max-width:95px;" onchange="onBillingMonthChange()"></select>
+          <select id="billing-year" style="min-width:110px;" onchange="onBillingMonthChange()"></select>
           <select id="billing-month" onchange="onBillingMonthChange()">
           <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
           <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
@@ -1091,6 +1091,8 @@ tr.inactive td{opacity:.38;}
     <div class="form-row">
       <div class="form-group" id="s-htime-group"><label>하원 시간</label><select id="s-htime"></select></div>
       <div class="form-group" id="s-freq-group"><label id="s-freq-label">수업 횟수</label><select id="s-freq"></select></div>
+      <div class="form-group"><label>개별 교습비 <span style="font-weight:400;color:var(--text3);font-size:11px;">(특이 케이스만 — 비우면 위 단가 자동 적용)</span></label>
+        <input type="text" id="s-custom-tuition" data-comma="1" placeholder="예: 480000 (비워두면 기본 단가)" style="width:100%;box-sizing:border-box;"></div>
     </div>
     <div class="section-label">셔틀</div>
     <div class="form-row">
@@ -1858,6 +1860,8 @@ function isBillTarget(s, billYear, billMonth){
 // TUITION CALC
 // ══════════════════════════════════════════════
 function getTuition(s){
+  // 개별 교습비(customTuition)가 지정된 특이 케이스는 그 값을 우선 적용
+  if(s.customTuition && s.customTuition>0) return s.customTuition;
   if(s.brand==='altiora') return findFeeAmt('altiora','tuition',s);
   if(s.brand==='pangram') return findFeeAmt('pangram','tuition',s);
   if(s.brand==='petamus') return findFeeAmt('petamus','tuition',s);
@@ -4606,6 +4610,7 @@ function openStudentModal(idx=-1){
   document.getElementById('s-sibling').checked=!!s?.sibling;
   document.getElementById('s-split').checked=!!s?.split;
   document.getElementById('s-no-fee').checked=!!s?.noFee;
+  { const ct=document.getElementById('s-custom-tuition'); if(ct) ct.value = s?.customTuition ? formatComma(String(s.customTuition)) : ''; }
   // 형제 검색창 초기화
   updateSiblingField();
   document.getElementById('s-sibling-id').value = s?.siblingId||'';
@@ -4649,7 +4654,7 @@ function saveStudent(){
     careDays:Array.from(document.querySelectorAll('.care-day-check:checked')).map(c=>c.value),careOverride:'',
     onetone:0,
     otDays:document.getElementById('s-ot-days')?.value||'',
-    customTuition:0,
+    customTuition:unComma(document.getElementById('s-custom-tuition')?.value)||0,
     otPayType:'',
     receipt:document.getElementById('s-receipt').value,sms:document.getElementById('s-sms').value,
     split:document.getElementById('s-split').checked,noFee:document.getElementById('s-no-fee').checked,memo:document.getElementById('s-memo').value.trim(),
